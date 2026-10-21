@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 import urllib.request
 from collections import defaultdict
@@ -84,9 +85,9 @@ def download(raw_dir: Path = DATA_DIR / "raw") -> dict[str, Path]:
         path = raw_dir / f"{name}.csv"
         if not path.exists():
             fd, tmp = tempfile.mkstemp(dir=raw_dir, suffix=".part")
-            os.close(fd)
             try:
-                urllib.request.urlretrieve(url, tmp)
+                with urllib.request.urlopen(url, timeout=60) as response, os.fdopen(fd, "wb") as f:
+                    shutil.copyfileobj(response, f)
                 verify(Path(tmp), expected)
                 os.replace(tmp, path)
             finally:

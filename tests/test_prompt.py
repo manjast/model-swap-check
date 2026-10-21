@@ -93,6 +93,7 @@ def test_d7_jev_translation_reproduces_the_committed_file(incumbent: Prompt) -> 
     expected_criteria = {e.intent: {"description": e.description, "example": e.example} for e in incumbent.catalog}
     assert c51["instructions"] == f"{incumbent.routing_instruction} {incumbent.oos_clause}"
     assert list(c51["criteria"]) == [*incumbent.intents, OUT_OF_SCOPE]
+    assert c51["criteria"][OUT_OF_SCOPE] == "The customer message is about none of the other options."
     assert c51["criteria"] == {**expected_criteria, OUT_OF_SCOPE: prompt.JEV_OOS_CRITERION}
     assert noul["instructions"] == incumbent.routing_instruction
     assert list(noul["criteria"]) == incumbent.intents

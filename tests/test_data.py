@@ -21,6 +21,18 @@ CERT_SLICES = {
     "account_other": 1143,
     "out_of_scope": 2597,
 }
+# SHA-256 of the newline-joined item IDs in split order (spec §2.3, §10): pins membership, salts and order.
+SPLIT_HASHES = {
+    "examples": "f023a1ad1cee39ece5f6a120f94190ca68c35d983ada73478473aa91b8830dc1",
+    "dev": "d9b48997e5687359b338e47a0a1d763be0b8ca6533786f50b8b2c2beb04d1734",
+    "cert": "5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b",
+    "pilot": "d34dfba232eea140878aa23b6dd864191de83b7544dfeb96ff147efd0bed5025",
+    "aa": "e97b2f3cd5dcc19c7501fe4594e0e5d1bacc698ce3e834b0018fe729945ad4ba",
+}
+SPEC_SHA256 = {  # spec §2.1
+    "train": "b06e26ac675513959a63135f11b94ea7786ed02da65db93a5650d8838cbc664b",
+    "test": "d12d6e3bc4c3103966ae786dc435913c0c563dfa328f5a3646d0e62cfeeb474d",
+}
 
 
 def test_d1_corrupted_file_fails_with_clear_error(tmp_path: Path) -> None:
@@ -29,9 +41,15 @@ def test_d1_corrupted_file_fails_with_clear_error(tmp_path: Path) -> None:
         data.download(tmp_path)
 
 
-def test_d1_verified_files_have_the_pinned_hashes() -> None:
+def test_d1_sources_and_files_match_the_spec() -> None:
+    for name, (url, sha) in data.SOURCES.items():
+        assert url == (
+            "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/"
+            f"57ec275d8078af65b7731c2a98be812d844a6d6b/banking_data/{name}.csv"
+        )
+        assert sha == SPEC_SHA256[name]
     for name, path in data.download().items():
-        assert data.sha256_file(path) == data.SOURCES[name][1]
+        assert data.sha256_file(path) == SPEC_SHA256[name]
 
 
 def test_d2_split_sizes_and_structure(splits: dict[str, list[data.Item]], groups: IntentGroups) -> None:
@@ -45,6 +63,7 @@ def test_d2_split_sizes_and_structure(splits: dict[str, list[data.Item]], groups
         "aa": 3080,
     }
     assert all(len(v) == len(sets[name]) for name, v in ids.items())
+    assert {name: data.item_list_hash(items) for name, items in splits.items()} == SPLIT_HASHES
     assert not sets["examples"] & sets["dev"]
     assert not sets["examples"] & sets["cert"]
     assert not sets["dev"] & sets["cert"]

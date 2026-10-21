@@ -42,8 +42,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/fake"
           echo "api_key = \"$(openssl rand -base64 30 | tr -dc A-Za-z0-9)\"" > "$RUNNER_TEMP/fake/settings.py"
-          if /tmp/gitleaks dir "$RUNNER_TEMP/fake" --no-banner --redact; then
-            echo "gitleaks missed a fake key"; exit 1
+          rc=0
+          /tmp/gitleaks dir "$RUNNER_TEMP/fake" --no-banner --redact --exit-code 42 || rc=$?
+          if [ "$rc" -ne 42 ]; then
+            echo "gitleaks did not report the fake key (exit $rc)"; exit 1
           fi
       - name: Gitleaks over the full history
         run: /tmp/gitleaks git . --no-banner --redact
