@@ -147,13 +147,16 @@ def planning_table(sims: int, seed: int) -> None:
     print("p      " + "".join(f"{o * 100:.2f}/{s * 100:.1f}pp   " for o, s in pairs))
     for p in (0.03, 0.05, 0.08):
         pd = {k: (2 * p if k == "out_of_scope" else p) for k in CERT_SLICES}
-        print(f"{p:.2f}   " + "".join(f"{simulate(pd, o, s, sims=sims, seed=seed)['joint']:>12.1%}   " for o, s in pairs))
+        print(
+            f"{p:.2f}   " + "".join(f"{simulate(pd, o, s, sims=sims, seed=seed)['joint']:>12.1%}   " for o, s in pairs)
+        )
     print("\nFalse release with the true difference at the margin (G1 alone, no calibration noise):")
     fr_sims = 4 * sims  # a 5% rate needs more runs than power to resolve to a few tenths of a point
     for p in (0.03, 0.08):
         pd = {k: p for k in CERT_SLICES}
         rate = simulate(pd, 0.005, 1.0, delta_true=0.005, dev_n=None, sims=fr_sims, seed=seed)["overall"]
-        print(f"  p_disc {p:.2f}, margin 0.50 pp: {rate:.2%}  (target 5%, Monte Carlo SE {math.sqrt(0.05 * 0.95 / fr_sims):.2%})")
+        mc_se = math.sqrt(0.05 * 0.95 / fr_sims)
+        print(f"  p_disc {p:.2f}, margin 0.50 pp: {rate:.2%}  (target 5%, Monte Carlo SE {mc_se:.2%})")
 
 
 def main() -> None:

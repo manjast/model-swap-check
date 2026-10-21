@@ -377,7 +377,7 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 ## 12. Repository and workflow
 
 - **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`openai`, `anthropic`, `typesafe-sdk`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`).
-- **CLI:** `swapcheck`, with subcommands `data`, `run`, `decide`, `report`.
+- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev translation, `--check` in CI), `run`, `decide`, `report`.
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
 
