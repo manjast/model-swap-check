@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: uv venv && uv pip install -e '.[dev]'
+      - name: Lint
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+      - name: Types
+        run: uv run --no-sync mypy
+      - name: Data (download and verify Banking77)
+        run: uv run --no-sync swapcheck data
+      - name: Jev translation up to date
+        run: uv run --no-sync swapcheck prompt --check
+      - name: Tests
+        run: uv run --no-sync pytest
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o /tmp/gitleaks.tgz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+      - name: Gitleaks detects a generated fake key
+        run: |
+          mkdir -p "$RUNNER_TEMP/fake"
+          echo "api_key = \"$(openssl rand -base64 30 | tr -dc A-Za-z0-9)\"" > "$RUNNER_TEMP/fake/settings.py"
+          rc=0
+          /tmp/gitleaks dir "$RUNNER_TEMP/fake" --no-banner --redact --exit-code 42 || rc=$?
+          if [ "$rc" -ne 42 ]; then
+            echo "gitleaks did not report the fake key (exit $rc)"; exit 1
+          fi
+      - name: Gitleaks over the full history
+        run: /tmp/gitleaks git . --no-banner --redact

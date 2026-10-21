@@ -1,0 +1,43 @@
+[project]
+name = "model-swap-check"
+version = "0.1.0"
+description = "Pre-registered, replayable decision on replacing gpt-4o-mini in a support-message router"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml==6.0.3",
+    "tiktoken==0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy==2.4.0",
+    "pytest==9.1.1",
+    "ruff==0.17.1",
+    "types-PyYAML==6.0.12.20260906",
+]
+
+[project.scripts]
+swapcheck = "swapcheck.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/swapcheck"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests", "analysis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

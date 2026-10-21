@@ -6,6 +6,10 @@
 # Response cache and scratch output (committed run records go under runs/)
 .cache/
 scratch/
+# Banking77 files and derived splits: downloaded and verified at runtime (spec §2.1)
+data/
+.mypy_cache/
+.ruff_cache/
 
 # Python
 __pycache__/

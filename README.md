@@ -8,10 +8,18 @@ Your LLM classifier has to move. OpenAI removes `gpt-4o-mini` from its API on 20
 
 Every model is scored against ground-truth labels on the same messages. Reasoning effort and request design are selected on development data. Acceptance rules are frozen before the test runs, and every decision can be replayed from the recorded responses.
 
-**Status:** specification phase. No model has been called yet.
+**Status:** M0 done: data, splits and the incumbent prompt are fixed. No model has been called yet.
 
 - [Specification](docs/spec.md)
 - [Test plan](docs/test-plan.md)
 - [Power analysis](analysis/power.py): how often the acceptance rules certify an equally good candidate
+- [Incumbent prompt](prompts/incumbent-v1.md) and its [Jev translation](prompts/jev-v1.yaml)
+
+```sh
+uv venv && uv pip install -e '.[dev]'
+.venv/bin/swapcheck data     # download Banking77 at a pinned commit, verify SHA-256, write the splits
+.venv/bin/swapcheck prompt   # prompt size and hash; regenerate the Jev translation
+.venv/bin/pytest
+```
 
 Data: [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) (Casanueva et al., 2020), CC BY 4.0, with the in-scope intents of Banking77-OOS (Zhang et al., 2022).
