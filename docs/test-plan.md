@@ -1,72 +1,79 @@
-# Test plan v1
+# Test plan v2
 
-Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4, §6) run in CI without API keys. The pilot (§5) is the only live check before `dev` runs. A test that only proves a value was passed through or a mock was echoed does not belong here.
+Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4, §6) run in CI without API keys. The pilot (§5) is the only live check before `dev` runs. Tests that only show that a value was passed through, or that a mock echoed its input, do not belong here.
 
 ## 1. Data and feature definition (M0)
 
 | ID | Test | Spec |
 |---|---|---|
 | T-D1 | Download verifies both SHA-256 values; a corrupted file fails with a clear error | §2.1 |
-| T-D2 | Split rule reproduces exactly: 1,540 `dev` (540 OOS), 11,543 `cert`, 100 `pilot`, 3,080 `aa`; `dev` ∩ `cert` = ∅ and `dev` ∪ `cert` = all rows | §2.3 |
-| T-D3 | `cert` slice sizes equal the §2.3 table | §2.3, §2.4 |
+| T-D2 | Splits reproduce exactly: 250 `examples`, 3,075 `dev` (1,075 OOS), 9,758 `cert`, 100 `pilot` ⊂ `dev`, 3,080 `aa` ⊂ `cert`. `examples`, `dev` and `cert` are pairwise disjoint and together cover all 13,083 rows | §2.3 |
+| T-D3 | `cert` slice sizes equal the §2.3 table and `analysis/power.py` `CERT_SLICES` | §2.3, §2.4 |
 | T-D4 | Intent groups: 50 in-scope intents, each in exactly one group; 27 OOS; union = the 77 Banking77 intents | §2.2, §2.4 |
-| T-D5 | Prompt build: catalog lists exactly the 50 in-scope intents, no OOS name appears anywhere in the prompt; stable prefix ≥ 1,100 `o200k_base` tokens; the user message is the raw customer text | §3.1 |
-| T-D6 | Leakage: no `cert` message text occurs as a substring of any prompt file | §2.5 |
+| T-D5 | Prompt: the catalog has exactly the 50 in-scope IDs. No OOS name occurs as a whole token, matched with `(?<![A-Za-z0-9_?])name(?![A-Za-z0-9_?])` and also in its space-separated form, so `exchange_rate` inside `card_payment_wrong_exchange_rate` is not a hit. Stable prefix ≥ 1,100 `o200k_base` tokens. The user message is the raw customer text | §3.1 |
+| T-D6 | Leakage: no casefolded, whitespace-collapsed `cert` or `dev` text equals any prompt sentence or example. Every example comes from `examples`. Short accidental phrase hits need an allowlist entry with a reason | §2.5 |
 
-## 2. Parsing, outcomes, metrics, threshold, cost (M1–M2)
+## 2. Parsing, outcomes, metrics, thresholds, cost (M1–M2)
 
 | ID | Test | Spec |
 |---|---|---|
 | T-P1 | Parser: valid output → `ok` with intent and confidence | §3.2 |
-| T-P2 | Parser: malformed JSON, missing field, unknown intent, confidence < 0, > 1 or non-numeric, refusal, truncation → `invalid_output` with the right `error_code` | §3.2, §9.2 |
-| T-P3 | Parser: intent differing only in case (`refund_not_showing_up`) → matched, `case_normalized = true` | §3.2 |
-| T-O1 | Routing table: every combination of status × intent (catalog / `out_of_scope`) × confidence vs τ (below / equal / above) × truth (in-scope same / in-scope other / OOS) gives the outcome in §3.3 and §5 | §3.3, §5 |
-| T-M1 | Metrics on a hand-built run of 20 items equal hand-computed W, A, V, top-1, OOS recall, API error rate, overall and per slice | §5 |
-| T-C1 | τ calibration on constructed data: picks the smallest τ with W ≤ 2%; returns 0 when already met; returns 1.01 when unreachable; never reads `cert` items (raises if given any) | §6 |
-| T-K1 | Cost: billed, steady and sparse cost per 1,000 messages from hand-built usage rows (uncached, cache read, cache write, output, reasoning) match hand computation for both providers | §11 |
+| T-P2 | Parser: malformed JSON, missing field, unknown intent, confidence < 0, > 1 or non-numeric, refusal, truncation → `invalid_output` with the matching `error_code` | §3.2, §9.2 |
+| T-P3 | Parser: `refund_not_showing_up` → matches `Refund_not_showing_up`, `case_normalized = true`, counted in the run totals | §3.2 |
+| T-O1 | Routing table: every combination of status × intent (catalog / `out_of_scope`) × confidence vs τ (below / equal / above) × truth (same in-scope / other in-scope / OOS) gives the §3.3/§5 outcome | §3.3, §5 |
+| T-M1 | Metrics on a hand-built run of 20 items equal hand-computed W, A, V, top-1, OOS recall and API error rate, overall and per slice; weighted `dev` W equals a hand computation with the §5 weights | §5 |
+| T-M3 | Paired comparison drops items that are `api_error` in either arm and reports the count; `invalid_output` stays as escalation | §7.4 |
+| T-C1 | τ on constructed data: `τ_inc` is the smallest qualifying value in T(inc); 0 when everything auto-routed already meets 2%; `out_of_scope` and invalid predictions are excluded from T; void-experiment signal when unreachable; `τ_c` is matched to the incumbent's weighted W; `τ_c` = 1.01 when unreachable; raises if given any `cert` item | §6 |
+| T-B1 | Competence baseline on a hand-computed corpus of 6 documents and 2 intents: IDF refit per fold, L2 normalization and leave-one-out predictions equal the hand values | §3.4 |
+| T-X1 | D-X selection on fixture iteration results: highest weighted A wins, ties go to fewer changed lines, iteration 0 is never counted toward the limit of 3 | §8 |
+| T-K1 | Cost from hand-built attempt rows for both providers: billed (all attempts, warm-ups, a timed-out attempt charged as full input + max output), steady and sparse per 1,000 messages; mean and p90 per class | §9.5, §11 |
 
 ## 3. Statistics and verdicts (M2)
 
 | ID | Test | Spec |
 |---|---|---|
-| T-S1 | Paired bootstrap bound on a constructed sample agrees with the normal approximation within 0.1 pp at n ≥ 1,000 | §7.4 |
-| T-S2 | Exact McNemar p-value equals a hand-computed binomial value for small discordant counts | §7.4 |
-| T-S3 | Simulation, true difference = margin: the gate certifies in ≤ 5.5% of 2,000 simulated runs (G1 and a single G2 slice) | §7.1 |
-| T-S4 | Simulation, true difference = 0: certification rate within ±3 pp of `analysis/power.py` for the same inputs | §7.3 |
-| T-S5 | Stratified bootstrap keeps slice composition in every resample | §7.4 |
-| T-S6 | Sample-size estimate equals the closed form; "not reachable" when d̂ ≥ δ | §7.4 |
-| T-V1 | Verdict truth table: constructed gate results produce each of SHIP, SHIP WITH CONDITIONS, BLOCK, INCONCLUSIVE, including the D-X variant | §7.2 |
-| T-V2 | G3 direction: a candidate that automates more never fails G3; one that automates 5 pp less with a tight bound fails | §7.1 |
+| T-S1 | Bootstrap bound vs normal approximation on constructed counts at n ≥ 5,000: within 0.05 pp | §7.4 |
+| T-S2 | Multinomial-cell bootstrap and item-level bootstrap on the same 2,000-item constructed sample: bounds within 0.1 pp (equivalence of the shortcut) | §7.4 |
+| T-S3 | False release: true difference = margin, p_disc ∈ {0.03, 0.08}, the §2.3 slice sizes, δ_W = 0.50 pp and δ_S = 2.0 pp. G1 alone and one G2 slice alone each certify in ≤ 5% + 2 Monte Carlo SE of 4,000 simulated runs. If the percentile bootstrap exceeds this, the bound method is changed before M3 and the spec updated | §7.1 |
+| T-S4 | Power: true difference = 0, same inputs; certification rate within ±3 pp of `analysis/power.py` without calibration noise | §7.3 |
+| T-S5 | The stratified overall draw keeps each slice's size in every resample | §7.4 |
+| T-S6 | Sample size: G1/G2 and G3 formulas equal the closed forms, with the correct direction for G3; "not reachable" on the wrong side of the margin | §7.4 |
+| T-S7 | On constructed runs, the cluster bootstrap reports a status change when intents are heterogeneous; the A/A comparison flags FAIL on a constructed unstable incumbent | §7.4, §7.6 |
+| T-M2 | Margin selection from a fixture `dev.json`: `power.py` selects the first pair meeting 80% in δ_W-then-δ_S order, applies the 1% floor, and exits 2 with the fallback when none qualifies | §7.3 |
+| T-V1 | Verdict table on constructed gate results: SHIP, BLOCK, INCONCLUSIVE (with sample sizes), the D-X conditions, the family-adjusted column, the A/A downgrade, the G2 composite rules (one slice FAIL vs some UNRESOLVED), and `τ_c` = 1.01 → G3 FAIL → BLOCK | §7.1, §7.2 |
+| T-V2 | Byte-identical decision record from the same inputs and seeds; no wall-clock fields; values rounded to 0.01 pp | §7.4 |
 | T-V3 | COST and LATENCY flags appear at the stated ratios and never change the verdict | §7.2 |
 
 ## 4. Providers, runner, guards (M1)
 
 | ID | Test | Spec |
 |---|---|---|
-| T-R1 | Request snapshots per configuration: model ID, reasoning/thinking settings, temperature present only where allowed, max tokens, identical JSON schema, cache settings (OpenAI explicit breakpoint at the end of the developer message; Anthropic `cache_control` on the system block and no top-level `cache_control`; `prompt_cache_key` mapping for `inc`) | §4, §3.2 |
-| T-R2 | Response normalization from recorded real responses (added after the pilot) for each configuration: text, usage classes incl. cache read/write and reasoning tokens, stop reason, request ID, returned model ID | §10 |
-| T-R3 | Retry policy with a fake transport: retryable codes retried with backoff up to 6 attempts and `retry-after` honoured; non-retryable codes not retried; final failure → `api_error` | §9.2 |
-| T-R4 | Runner with a fake provider: concurrency never exceeds 16; warm-up request completes before the fan-out starts | §4 |
-| T-R5 | Resume: kill a run mid-way, restart with the same `run_id`: no item is requested twice and `items.jsonl` has exactly one row per item; a new `run_id` requests every item again | §9.3 |
-| T-R6 | Budget guard: refuses a run whose spent + projected cost exceeds the cap; allows it just under | §9.5 |
-| T-R7 | Freeze guard: a `cert` run refuses without tag `contract-v1`, with a modified contract file, or with a dirty tree; starts when all three hold | §9.5 |
-| T-R8 | `decide` refuses a run with API error rate > 0.5% and accepts it after one recorded `--retry-errors` pass | §9.2 |
-| T-R9 | Records validate against the §10 field list; ground truth is absent from `items.jsonl` | §10 |
+| T-R1 | Request snapshots per configuration: model ID, reasoning/thinking settings, temperature only where allowed, max tokens, identical JSON schema. Cache settings: OpenAI explicit breakpoint at the end of the developer message; Anthropic `cache_control` on the system block and none at top level; `prompt_cache_key` mapping for `inc` | §4, §3.2 |
+| T-R2 | Response normalization from recorded real responses (pilot fixtures): text, usage classes incl. cache read/write and reasoning tokens, stop reason, request ID, returned model ID | §10 |
+| T-R3 | Retry policy with a fake transport: retryable codes are retried with backoff up to 6 attempts and `retry-after` is honoured; non-retryable codes are not retried; final failure → `api_error`; every attempt's usage is kept | §9.2, §10 |
+| T-R4 | Runner with a fake provider: concurrency ≤ 16; the configured RPM is never exceeded over any 60 s window; warm-ups (16 for `inc`) complete before the fan-out | §4, §9.4 |
+| T-R5 | Resume: a killed run with a partial last line resumes with the same `run_id`; no item is requested twice and the finalized file has exactly one row per item. A new `run_id` requests every item | §9.3 |
+| T-R6 | Budget: the pre-freeze projection over all planned runs applies the drop order; a run that is not affordable does not start; a run stops at cap − $0.50 and is marked incomplete | §9.5 |
+| T-R7 | Freeze guard: a `cert` run refuses without the tag or with a modified file under `src/`, `prompts/`, `config/`, `contracts/` or `analysis/`. It starts when only `runs/` changed, including with an earlier run directory present and when resuming a partial run | §9.5 |
+| T-R8 | `decide` refuses a run whose API error rate is > 0.5%; after one `--retry-errors` pass it accepts only if the rate is ≤ 0.5% | §9.2 |
+| T-R9 | Records validate against the §10 field lists; ground truth is absent from item rows | §10 |
+| T-R10 | `decide` refuses a manifest entry whose configuration, prompt, schema or item-list hash, or contract tag commit, does not match the contract | §10 |
 
 ## 5. Pilot acceptance (M3, live, ≈ $0.15)
 
 | ID | Criterion | Spec |
 |---|---|---|
-| T-L1 | Each configuration: V ≥ 99.5% on the 100 pilot items; no API errors after retries | §5, §9.2 |
-| T-L2 | Cache: after warm-up, cache-read tokens > 0 on ≥ 90% of calls for `inc`, `luna-none`, `luna-low`, `haiku55-off`, `haiku55-low` | §4 |
-| T-L3 | Luna explicit vs implicit mode on the same items: cache reads, writes and billed cost recorded; mode for `cert` confirmed or changed with a reason | §14 |
-| T-L4 | Measured cost per item within ±25% of the cost model; the budget projection for `dev` and `cert` updated | §9.5 |
+| T-L1 | Smoke: each configuration has ≤ 1 invalid output in 100 and no API errors after retries | §5, §9.2 |
+| T-L2 | Cache: after warm-up, share of calls with cache reads measured and reported for every configuration; ≥ 90% expected for `luna-none`, `luna-low`, `haiku55-off`, `haiku55-low`; `inc` measured only (implicit, best-effort) | §4 |
+| T-L3 | Luna explicit vs implicit cache mode on the same items: reads, writes and billed cost recorded; the `cert` mode confirmed or changed with a reason | §14 |
+| T-L4 | Cost model built from measured token counts (§11); budget projection for `dev` and `cert` updated | §11 |
 | T-L5 | Every §14 open item has a recorded answer in `docs/pilot.md` | §14 |
-| T-L6 | Real responses saved as fixtures for T-R2 (keys and request IDs stripped) | §10 |
+| T-L6 | Real responses saved as fixtures for T-R2, with request IDs kept and no secrets | §10 |
+| T-L7 | Latency p50/p95, overall and split by cache read, computed from the pilot records | §9.4 |
 
 ## 6. Replay and CI (M2, M5)
 
 | ID | Test | Spec |
 |---|---|---|
 | T-G1 | Golden replay: `swapcheck decide` on committed fixture runs (M2) and on the real runs (M5) reproduces byte-identical decision records | §10 |
-| T-G2 | CI runs ruff, mypy, pytest and gitleaks on every PR; a committed fake key fails the gitleaks job | §12 |
+| T-G2 | CI runs ruff, mypy, pytest and gitleaks on every PR. A CI step writes a generated fake key to a temporary file outside the repository and asserts that gitleaks fails on it; nothing secret-shaped is ever committed | §12 |
