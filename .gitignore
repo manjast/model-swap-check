@@ -1,0 +1,17 @@
+# Secrets: API keys live only in .env (see .env.example)
+.env
+.env.*
+!.env.example
+
+# Response cache and scratch output (committed run records go under runs/)
+.cache/
+scratch/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
