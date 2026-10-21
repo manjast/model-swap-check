@@ -250,18 +250,20 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 ### 8.1 Reasoning effort (D-A2, D-B2)
 
-**Why this rule.** Reasoning at `medium` costs about $0.0005 per message, far less than the value of one more message routed without a person. So any real automation gain pays for itself, and the only thing a threshold has to guard against is noise. With about 3,075 `dev` items, the noise in a paired difference is roughly ±0.4–0.6 pp; the bound below adapts to the noise actually observed instead of a fixed number of points.
+**Why this rule.** Reasoning at `medium` costs about $0.0005 per message, far less than the value of one more message routed without a person. So any real automation gain pays for itself, and the only thing the rule has to guard against is noise. That noise has two sources: which items happen to be in `dev`, and the thresholds τ, which are fitted on those same items. The test below resamples both, instead of using a fixed number of points.
 
-**Gain test.** For two configurations X and Y of one vendor, each at its own τ:
+**Items.** For a comparison of X with Y (same vendor), the `dev` items used are those present and not `api_error` in X, Y and `inc`. The §5 weights are renormalized over that set, and the dropped count is logged. `invalid_output` counts as not auto-routed (§3.3). A `dev` run that is incomplete (stopped at its §9.5 ceiling) is treated like a skipped one: its level is not in E.
 
-- **Per-item difference:** d_i = auto_X,i − auto_Y,i ∈ {−1, 0, 1}, with the §5 weights w_i (summing to 1).
-- **Mean and spread:** d̄ = Σ w_i d_i and SE = √(Σ w_i² (d_i − d̄)²), both computed with `math.fsum` in item-ID order.
-- **Verdict:** X *really gains* over Y iff d̄ − 1.2816 · SE > 0 (one-sided 90% lower bound; 0 itself does not count).
+**Gain test.** X *really gains* over Y iff both hold:
+
+- **Recalibrating bootstrap:** in each of 2,000 resamples, draw `dev` items with replacement within each intent; recompute `τ_inc`, `τ_X` and `τ_Y` by §6 on the resample; compute d̄* = weighted A_X − weighted A_Y. The 10th percentile of d̄* (`numpy.quantile`, `method="lower"`) must be > 0. RNG: `numpy.random.default_rng(SeedSequence([20261021, 81, vendor_index, comparison_index]))`.
+- **Small-count guard:** an exact one-sided sign test on the unweighted discordant counts (X auto-routed and Y not, vs the reverse) gives p < 0.10. This stops a gain resting on a handful of items, for example when Y ends with τ = 1.01 and auto-routes nothing.
 
 **Selection**, with `none/off` the no-reasoning configuration:
 
 - **Qualifying levels:** E = the levels in {`low`, `medium`} that really gain over `none/off`.
 - **Choice:** if E is empty, D-A2/D-B2 is NOT RUN (`no dev gain`), reported with the `dev` numbers. Otherwise `R` = `medium` if `medium` ∈ E and (`low` ∉ E or `medium` really gains over `low`); else `R` = `low`. The cheaper level wins unless the dearer one shows a real gain.
+- **Error rate, stated:** with no true gain, up to three 90% tests per vendor make a reasoning level qualify by chance in roughly 15–20% of cases per vendor. That is accepted: the cost is one unneeded `cert` run, and release is still controlled by G1–G3.
 - **Budget substitution:** if §9.5 would drop `R` = `medium` for budget and `low` ∈ E, `low` replaces it before anything is dropped; the substitution is recorded in the contract.
 - **Always certified:** the no-reasoning configuration (`luna-none`, `haiku55-off`), the cheapest and fastest option.
 - **Skipped `dev` runs:** a level whose `dev` run was skipped by the pre-`dev` budget gate (§9.5) is not in E.
@@ -286,7 +288,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 | Phase | Split | Configurations |
 |---|---|---|
 | Pilot (M3) | `pilot` | all ten configurations in §4 except `luna-none-x`; plus `luna-none` in implicit cache mode (caching comparison) and both Jev designs with reversed option order (order sensitivity) |
-| Dev (M4) | `dev` | in this order: `inc` (§3.4 first); `jev-c51`, `jev-noul`; `luna-none`, `haiku55-off`; `luna-low`, `haiku55-low`; D-X iterations; `luna-medium`, `haiku55-medium` last, after the pre-`dev` budget gate (§9.5) may skip them |
+| Dev (M4) | `dev` | in this order: `inc` (§3.4 first); `jev-c51`, `jev-noul`; `luna-none`, `haiku55-off`; `luna-low`, `haiku55-low`; D-X iterations; `luna-medium`, `haiku55-medium` last (either may already have been skipped by the pre-`dev` gate, §9.5) |
 | Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-none-x`, `luna-R`; Anthropic `haiku55-off`, `haiku55-R`; TypeSafe `jev-D`. `R` runs only if §8.1 certifies it. Exactly one run per configuration and split under a contract tag (§9.5) |
 
 ### 9.2 Errors and retries
@@ -350,7 +352,7 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
   - slice table;
   - naive-swap table;
   - up to 20 messages that became `wrong_auto` under the candidate, in digest order;
-  - cost and latency;
+  - cost, latency, and reasoning/thinking tokens per message (mean and p95);
   - noise floor and sensitivity;
   - what was not tested.
 
