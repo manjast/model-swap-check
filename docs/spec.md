@@ -79,17 +79,18 @@ Seven slices: the six in-scope groups (assigned from intent names by the team a 
 
 ### 3.1 Prompt (`prompts/incumbent-v1.md`, committed before any model call)
 
-- **Developer/system message (stable prefix):** routing instructions, then 50 catalog entries in alphabetical order of intent ID. Each entry has `<intent_id>`, a one-line description written from that intent's `examples` messages, and one example message (the intent's smallest-digest `examples` item).
-  - Instructions: choose exactly one catalog intent, or `out_of_scope` if none fits. `confidence` is the probability that the chosen value is correct.
+- **Developer/system message (stable prefix):** routing instructions, then the 50 catalog entries. Each entry has `<intent_id>`, a one-line description written from that intent's `examples` messages, and one example message (the intent's smallest-digest `examples` item).
+  - **Catalog order** (every configuration, every enum, every Jev option list): `sorted(ids, key=lambda s: (s.casefold(), s))`, with `out_of_scope`, where it exists, always last.
+  - **Instructions:** three marked parts, so the Jev translation can reuse them exactly. `routing_instruction`: choose exactly one catalog intent for the customer message. `oos_clause`: answer `out_of_scope` if none fits. `output_clause`: the JSON fields, and `confidence` as the probability that the chosen value is correct.
   - No OOS intent name appears in the prompt.
 - **User message:** the customer message, unchanged.
-- **Jev translation (`prompts/jev-v1.yaml`):** the same instructions, descriptions and examples, in TypeSafe's request shape (§4.1). No content is added or removed in translation.
+- **Jev translation (`prompts/jev-v1.yaml`):** generated from the incumbent prompt by the fixed transformation in §4.1, never edited by hand.
 - **Prefix length:** the stable prefix must be ≥ 1,100 `o200k_base` tokens, so it can be cached on every configuration (OpenAI minimum 1,024; Haiku 5.5 minimum 512). Reached through content, never padding.
 
 ### 3.2 Output schema
 
 - **LLMs:** `{"intent": <enum: 50 catalog IDs + "out_of_scope">, "confidence": <number>}`, both required, `additionalProperties: false`, through each provider's native structured-output mechanism. Claude's API supports no numeric bounds, so our parser checks `0 ≤ confidence ≤ 1` for every LLM. Enum values are matched case-insensitively (Claude's documented casing caveat); case-normalized matches are counted per run.
-- **Jev:** typed by the API. The Choice answer's `choice` is the intent, its `confidence` the confidence; its `probabilities` are stored. The Noul answer (design `jev-noul`) is a probability that the message matches the catalog.
+- **Jev:** typed by the API. The Choice answer's `choice` is the intent and its `confidence` the confidence. The `probabilities` and, for `jev-noul`, the Noul probability are stored per item (§10).
 
 ### 3.3 Routing policy with threshold τ
 
@@ -140,9 +141,13 @@ API errors are handled in §7.4, not by this policy.
 
 ### 4.1 Jev requests
 
-- **`jev-c51`:** `state` = the customer message. One Choice question: `instructions` = the routing instruction; `criteria` = the 50 catalog intents, each mapped to an object `{description, example}`, plus `out_of_scope` mapped to "The message is about none of the other options."
-- **`jev-noul`:** `state` = `{"message": <customer message>, "catalog": {<intent>: <description>}}`. Two questions in one request: the same Choice over the 50 intents (no `out_of_scope`), and a Noul "Does `message` ask about any of the topics in `catalog`?".
-- **Both:** options in alphabetical order of intent ID, as in the LLM prompt. TypeSafe documents a lean toward the first option, so the pilot measures order sensitivity (§14). The model is pinned by version ID, never by alias.
+The transformation from `prompts/incumbent-v1.md` is fixed; T-D7 checks that applying it reproduces `prompts/jev-v1.yaml` exactly.
+
+- **Both designs:** `state` = the customer message string, unchanged. Choice `criteria` = the 50 catalog intents in catalog order, each mapped to `{"description": <description>, "example": <example message>}`, copied verbatim. `output_clause` is dropped: Jev's output is typed, and its confidence is computed by the API.
+- **`jev-c51`:** Choice `instructions` = `routing_instruction` + " " + `oos_clause`, verbatim. One more criterion appended last: `"out_of_scope": "The customer message is about none of the other options."`
+- **`jev-noul`:** Choice `instructions` = `routing_instruction` only, so it does not mention an option that does not exist. A Noul question in the same request: `instructions` = `{"question": "Does the customer message ask about any of the topics in catalog?", "catalog": {<intent>: <description>, … in catalog order}}`.
+- **Model:** pinned by version ID, never by alias.
+- **Option order:** TypeSafe documents a lean toward the first option, so the pilot reverses the 50 intents (keeping `out_of_scope` last) for both designs and reports order sensitivity per design (§14).
 
 ## 5. Outcomes and metrics
 
@@ -186,6 +191,7 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 | SHIP | all four gates PASS. Conditions always stated: the candidate's τ, and for D-X the adapted prompt |
 | BLOCK | any gate FAIL |
 | INCONCLUSIVE | otherwise; every UNRESOLVED gate reports the sample size needed (§7.4) |
+| NOT RUN | the candidate never reached `cert`, with reason `no dev gain` (§8.1) or `budget` (§9.5). `decide` writes a short record with the `dev` numbers and no gate table; the manifest lists the decision as not run |
 
 - **Release errors:** each verdict is a single intersection–union test at α = 5% one-sided. G1–G3 all have to pass, so no correction is needed within a decision.
 - **Harm side:** corrected over the 7 slices (G2 FAIL rule).
@@ -196,7 +202,7 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 ### 7.3 Margins *(M4)*
 
 - **Grid:** δ_W ∈ {0.50, 0.75, 1.00} pp; δ_S ∈ {1.5, 2.0, 2.5, 3.0} pp. Business meaning: 0.5 pp = 5 more misrouted messages per 1,000.
-- **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across every candidate configuration that §8 sends to `cert`, at its τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%.
+- **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across the LLM candidate configurations in the final `cert` plan, taken after the §9.5 budget plan, each at its τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%. Jev is excluded from this input, so a structurally different model cannot loosen every LLM decision's margins; D-J uses the same margins (one business tolerance for every candidate) and its record states its own power at them, computed the same way from its `dev` discordance.
 - **Selection:** `analysis/power.py --pdisc-json` simulates G1 + G2 with the same Tango bound and the calibration noise of §6. It selects the first pair, ordered by δ_W then δ_S, whose joint power for an equally good candidate is ≥ 80%.
 - **Fallback:** if none reaches 80%, use (1.00, 3.0) and write the power into the contract.
 - **Planning estimate:** with assumed discordance 3–8% (doubled for OOS), joint power at (1.00, 3.0) is 66–95% (`python analysis/power.py`).
@@ -215,7 +221,7 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 
 ### 7.5 Naive-swap analysis (descriptive)
 
-Each candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes.
+Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes. D-J reports "not applicable": Jev's confidence is on a different scale, and moving to Jev is not a model-ID swap.
 
 ### 7.6 Noise floor
 
@@ -238,15 +244,17 @@ Each candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals
 
 ## 8. Selections made on `dev`
 
-All three selections use weighted `dev` metrics at each configuration's own τ (§6), are logged with their numbers, and are frozen in the contract.
+All three selections use weighted `dev` metrics at each configuration's own τ (§6), are logged with their numbers, and are frozen in the contract. A values are computed exactly with `fractions.Fraction` (the weights are ratios of counts) and compared exactly, so boundary cases do not depend on floating-point summation order.
 
 ### 8.1 Reasoning effort (D-A2, D-B2)
 
-For each vendor, with A = weighted `dev` automation rate:
+For each vendor, with A = weighted `dev` automation rate and `none/off` the no-reasoning configuration:
 
-- **Candidate level:** `R` = `medium` if A(`medium`) − A(`low`) ≥ 1.0 pp, else `low`. The cheaper level wins unless the dearer one buys a clear gain.
-- **Certified only if it pays:** `R` goes to `cert` only if A(`R`) − A(none/off) ≥ 1.0 pp. Otherwise D-A2 or D-B2 is reported as "not certified: no `dev` gain over no reasoning", with the `dev` numbers.
+- **Qualifying levels:** E = the levels in {`low`, `medium`} with A(level) − A(none/off) ≥ 1.0 pp.
+- **Selection:** if E is empty, D-A2/D-B2 is NOT RUN (`no dev gain`), reported with the `dev` numbers. Otherwise `R` = `medium` if `medium` ∈ E and (`low` ∉ E or A(`medium`) − A(`low`) ≥ 1.0 pp); else `R` = `low`. The cheaper level wins unless the dearer one buys a clear gain.
+- **Budget substitution:** if §9.5 would drop `R` = `medium` for budget and `low` ∈ E, `low` replaces it before anything is dropped; the substitution is recorded in the contract.
 - **Always certified:** the no-reasoning configuration (`luna-none`, `haiku55-off`), the cheapest and fastest option.
+- **Skipped `dev` runs:** a level whose `dev` run was skipped by the pre-`dev` budget gate (§9.5) is not in E.
 
 ### 8.2 Jev request design (D-J)
 
@@ -266,15 +274,16 @@ For each vendor, with A = weighted `dev` automation rate:
 
 | Phase | Split | Configurations |
 |---|---|---|
-| Pilot (M3) | `pilot` | all ten configurations in §4 except `luna-none-x`, plus `luna-none` in implicit cache mode (caching comparison) and `jev-c51` with options in reverse order (order sensitivity) |
-| Dev (M4) | `dev` | `inc` first (§3.4); then `luna-none`, `luna-low`, `luna-medium`, `haiku55-off`, `haiku55-low`, `haiku55-medium`, `jev-c51`, `jev-noul`; then D-X iterations |
+| Pilot (M3) | `pilot` | all ten configurations in §4 except `luna-none-x`; plus `luna-none` in implicit cache mode (caching comparison) and both Jev designs with reversed option order (order sensitivity) |
+| Dev (M4) | `dev` | `inc` first (§3.4); then `luna-none`, `luna-low`, D-X iterations, `luna-medium`; `haiku55-off`, `haiku55-low`, `haiku55-medium`; `jev-c51`, `jev-noul`. Medium runs come last per vendor and may be skipped by the pre-`dev` budget gate (§9.5) |
 | Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-none-x`, `luna-R`; Anthropic `haiku55-off`, `haiku55-R`; TypeSafe `jev-D`. `R` runs only if §8.1 certifies it. Exactly one run per configuration and split under a contract tag (§9.5) |
 
 ### 9.2 Errors and retries
 
 - **Retried:** connection errors, timeouts (60 s), HTTP 408, 409, 429, 500, 502, 503, 504, 529. Exponential backoff from 1 s, ×2, full jitter, honouring `retry-after`, at most 6 attempts.
 - **Not retried:** 400, 401, 403, 404, 422 → `api_error`.
-- **`invalid_output`:** refusal stop reason, truncation at max tokens, unparseable JSON, intent not in the enum after case-insensitive matching, confidence missing or outside [0, 1].
+- **`invalid_output` (LLMs):** refusal stop reason, truncation at max tokens, unparseable JSON, intent not in the enum after case-insensitive matching, confidence missing or outside [0, 1].
+- **`invalid_output` (Jev):** a missing or extra answer key; a `choice` outside the criteria keys; `confidence` or Noul probability missing or outside [0, 1]; `probabilities` missing or summing outside 1 ± 0.01. A 400 (including `max_tokens_exceeded`) is `api_error`.
 - **Validity threshold:** a run is valid for `decide` only if its API error rate is ≤ 0.5%.
 - **Retry pass:** one `--retry-errors` pass per run rewrites `api_error` rows in place and records the count in `run.json`. `decide` accepts the run only if the rate is ≤ 0.5% after that pass.
 
@@ -287,16 +296,17 @@ For each vendor, with A = weighted `dev` automation rate:
 
 ### 9.4 Rate limits and latency
 
-- **Limits file:** `config/limits.yaml` holds RPM and TPM per provider and model. Values are 80% of the account limits read from response headers in the pilot (OpenAI `x-ratelimit-limit-*`, Anthropic `anthropic-ratelimit-*`).
-- **Enforcement:** a token bucket in the runner. 429 responses are counted per run.
+- **Limits file:** `config/limits.yaml` holds, per provider and model, request and token limits with an explicit unit (per minute or per second). Values are 80% of the account limits: OpenAI and Anthropic per minute, read from response headers in the pilot (`x-ratelimit-limit-*`, `anthropic-ratelimit-*`); TypeSafe per second, entered from its console because no header is documented.
+- **Enforcement:** a token bucket per provider that refills in the limit's own unit, so a per-second limit is never exceeded in any 1 s window. 429 responses are counted per run.
 - **Latency:** monotonic wall-clock time of the final attempt, non-streamed, at concurrency 16, from this machine. Reported as p50/p95 overall and split by calls with and without cache reads. Provider timing headers are stored where available. Indicative only.
 
 ### 9.5 Budget and freeze guards
 
 - **Caps:** `config/budget.yaml` caps OpenAI and Anthropic at $10 each and TypeSafe at $5 (Stefan's TypeSafe budget).
 - **Spent:** the cost of every attempt and warm-up across all run records. An attempt that timed out is charged as full uncached input plus max output tokens.
+- **Pre-`dev` gate (after the pilot):** spent + every planned `dev` run + the mandatory `cert` runs (`inc`, `luna-none`, `aa` for OpenAI; `haiku55-off` for Anthropic), each × per-item p90 cost from the pilot, must stay ≤ cap − $0.50. If not, the `*-medium` `dev` run of that vendor is skipped, then `*-low`. Each `dev` run gets a spend ceiling that keeps the mandatory `cert` reserve; reaching it stops the run as incomplete without affecting later runs.
 - **Projection before the freeze (M4):** spent + every remaining planned run × per-item p90 cost from that configuration's `dev` run (`luna-none-x` uses its selected iteration).
-- **Drop order:** if the projection exceeds a cap, planned `cert` runs are dropped in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are reported as "not run (budget)"; a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
+- **Drop order:** if the projection exceeds a cap, first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
 - **In-run stop:** a run stops when spent reaches cap − $0.50 and is marked incomplete; later runs for that provider do not start. Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
 - **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
@@ -312,8 +322,8 @@ For each vendor, with A = weighted `dev` automation rate:
 
 ### `runs/<run_id>/items.jsonl.gz`, one row per item
 
-- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (≤ 2,000 chars), `intent`, `confidence`, `case_normalized`, `latency_ms`, `request_id`, `model_id`.
-- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking).
+- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars; Jev: the full response JSON, uncapped), `intent`, `confidence`, `probabilities` (Jev only, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
+- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking). Jev usage maps to uncached input and output (output priced at $0).
 - **Ground truth:** not stored; `decide` joins it from the split.
 
 ### `runs/manifest.yaml`
@@ -383,5 +393,5 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 | reasoning/thinking tokens per item at `low` and `medium` (drives the budget) | pilot |
 | account rate limits per provider (OpenAI, Anthropic per minute; TypeSafe per second) | pilot (response headers and console) |
 | OpenAI server timing header available through the SDK | pilot |
-| Jev option-order sensitivity: share of pilot items whose choice changes when the option order is reversed | pilot (reported; a share > 5% is stated as a limitation in every Jev decision record) |
+| Jev option-order sensitivity, per design: share of pilot items whose choice changes when the 50 intents are reversed (`out_of_scope` kept last) | pilot (reported; a share > 5% for the selected design is stated as a limitation in the D-J record) |
 | Jev latency from this machine (TypeSafe reports 70–500 ms from its own US West Coast location) | pilot |
