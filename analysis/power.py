@@ -14,9 +14,10 @@ simulated experiment therefore draws one common shift
     delta_0 ~ Normal(0, sqrt(p_disc_overall / dev_n))
 added to every slice's true difference (clamped so the cell probabilities stay valid).
 
-Gate (normal approximation of the paired difference; the shipped gate is a multinomial
-paired bootstrap and test T-S4 checks the two agree):
-    d = (n10 - n01) / n,  se = sqrt(((n10 + n01) / n - d**2) / n),  certify iff d + z * se < margin
+Gate (spec §7.1): Tango (1998) score test for a difference of paired proportions. The upper
+bound is below the margin exactly when the score statistic evaluated at the margin is below -z,
+so no inversion is needed here:
+    certify iff tango_score(n10, n01, n, margin) < -z
 
 Standard library only (Python >= 3.12 for random.binomialvariate).
 
@@ -65,10 +66,19 @@ def _draw_discordant(n: int, p_disc: float, delta: float, rng: random.Random) ->
     return n10, n_disc - n10
 
 
+def tango_score(n10: int, n01: int, n: int, delta: float) -> float:
+    """Tango score statistic for H0: P(only candidate wrong) - P(only incumbent wrong) = delta."""
+    w = -n10 - n01 + (2 * n - n10 + n01) * delta
+    q = (math.sqrt(max(w * w + 8 * n * n01 * delta * (1 + delta), 0.0)) - w) / (4 * n)
+    var = n * (2 * q + delta * (1 - delta))
+    diff = n10 - n01 - n * delta
+    if var <= 0:
+        return math.copysign(math.inf, diff) if diff else 0.0
+    return diff / math.sqrt(var)
+
+
 def _certified(n10: int, n01: int, n: int, margin: float, z: float) -> bool:
-    d = (n10 - n01) / n
-    se = math.sqrt(max((n10 + n01) / n - d * d, 0.0) / n)
-    return d + z * se < margin
+    return tango_score(n10, n01, n, margin) < -z
 
 
 def simulate(
@@ -139,10 +149,11 @@ def planning_table(sims: int, seed: int) -> None:
         pd = {k: (2 * p if k == "out_of_scope" else p) for k in CERT_SLICES}
         print(f"{p:.2f}   " + "".join(f"{simulate(pd, o, s, sims=sims, seed=seed)['joint']:>12.1%}   " for o, s in pairs))
     print("\nFalse release with the true difference at the margin (G1 alone, no calibration noise):")
+    fr_sims = 4 * sims  # a 5% rate needs more runs than power to resolve to a few tenths of a point
     for p in (0.03, 0.08):
         pd = {k: p for k in CERT_SLICES}
-        rate = simulate(pd, 0.005, 1.0, delta_true=0.005, dev_n=None, sims=sims, seed=seed)["overall"]
-        print(f"  p_disc {p:.2f}, margin 0.50 pp: {rate:.2%}  (target 5%, Monte Carlo SE {math.sqrt(0.05 * 0.95 / sims):.2%})")
+        rate = simulate(pd, 0.005, 1.0, delta_true=0.005, dev_n=None, sims=fr_sims, seed=seed)["overall"]
+        print(f"  p_disc {p:.2f}, margin 0.50 pp: {rate:.2%}  (target 5%, Monte Carlo SE {math.sqrt(0.05 * 0.95 / fr_sims):.2%})")
 
 
 def main() -> None:

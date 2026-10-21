@@ -48,7 +48,7 @@ All selections come from `train.csv`, per intent, in ascending digest order:
 - **`examples`**: the first 5 rows of each in-scope intent; 250 items. The only messages that prompt authoring may read (§3.1).
 - **`dev`**: the next 40 rows of every intent, or all remaining rows if fewer (`contactless_not_working` has 35). 3,075 items, 1,075 of them OOS.
 - **`cert`**: every other `train.csv` row plus all of `test.csv`. 9,758 items, 26.6% OOS.
-- **`pilot`**: the 100 `dev` items with the smallest digests.
+- **`pilot`**: 100 `dev` items: for each of the 50 in-scope intents, the item with the smallest pilot digest `sha256("model-swap-check-pilot:" + item_id + ":" + text)`, plus the 50 OOS `dev` items with the smallest pilot digests.
 - **`aa`**: the 3,080 `test-*` items. The second incumbent run, used for the noise floor.
 
 `cert` slice sizes (test T-D3):
@@ -150,7 +150,7 @@ API errors are handled in §7.4, not by this policy.
 
 ### 7.1 Gates (candidate minus incumbent, paired on the same items, each at its own τ)
 
-Bounds are one-sided. For a confidence level q, `U_q` is the upper bound and `L_q` the lower bound.
+Bounds are one-sided Tango (1998) score bounds for a difference of paired proportions, computed from the discordant counts. They are deterministic (no resampling). For a confidence level q, `U_q` is the upper bound and `L_q` the lower bound. Simulated at the §2.3 slice sizes, the 95% upper bound releases a candidate that is exactly at the margin in 4.5–5.3% of runs, within Monte Carlo error of 5%. A percentile bootstrap and the normal approximation gave 5.6–6.6% and were rejected.
 
 | Gate | Metric | PASS | FAIL | otherwise |
 |---|---|---|---|---|
@@ -177,17 +177,16 @@ Bounds are one-sided. For a confidence level q, `U_q` is the upper bound and `L_
 
 - **Grid:** δ_W ∈ {0.50, 0.75, 1.00} pp; δ_S ∈ {1.5, 2.0, 2.5, 3.0} pp. Business meaning: 0.5 pp = 5 more misrouted messages per 1,000.
 - **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across all five candidates at their τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%.
-- **Selection:** `analysis/power.py --pdisc-json` simulates G1 + G2 with the calibration noise of §6. It selects the first pair, ordered by δ_W then δ_S, whose joint power for an equally good candidate is ≥ 80%.
+- **Selection:** `analysis/power.py --pdisc-json` simulates G1 + G2 with the same Tango bound and the calibration noise of §6. It selects the first pair, ordered by δ_W then δ_S, whose joint power for an equally good candidate is ≥ 80%.
 - **Fallback:** if none reaches 80%, use (1.00, 3.0) and write the power into the contract.
 - **Planning estimate:** with assumed discordance 3–8% (doubled for OOS), joint power at (1.00, 3.0) is 66–95% (`python analysis/power.py`).
 
 ### 7.4 Statistics
 
 - **Paired data:** an item that is `api_error` in either arm is dropped from both arms of that comparison, and the count is reported. `invalid_output` stays and counts as escalation.
-- **Bootstrap:** per slice, the four cells of the paired indicator (wrong-auto for G1/G2, auto-routed for G3) are resampled as one multinomial draw. This is equivalent to resampling items, and cheap. G1 and G3 sum the slice draws, so the slice composition is kept. 10,000 resamples. Bounds use `numpy.quantile` with `method="higher"` for upper and `"lower"` for lower bounds.
-- **Determinism:** RNG `numpy.random.default_rng(SeedSequence([20261021, decision_index, gate_index]))`; slices are drawn in `config/intent-groups.yaml` order.
-- **Cross-check:** the normal-approximation bound of `analysis/power.py`, reported next to each bootstrap bound.
-- **Sensitivity:** a cluster bootstrap that resamples intents within each slice. Any gate whose status would change is reported.
+- **Bounds:** Tango score bound per gate (§7.1), inverted by bisection to 1e-9. G1 and G3 use the pooled counts over all `cert` items; G2 uses each slice's counts.
+- **Cross-check:** the Wald (normal-approximation) bound, reported next to each Tango bound.
+- **Sensitivity:** a cluster bootstrap that resamples intents within each slice (10,000 resamples, `numpy.random.default_rng(SeedSequence([20261021, decision_index, gate_index]))`, slices in `config/intent-groups.yaml` order, percentile bounds). Any gate whose status would change under it is reported; it never changes the verdict.
 - **Sample size needed:**
   - G1/G2: n = ⌈p̂·(z₀.₉₅ + z₀.₈₀)² / (δ − d̂)²⌉ when d̂ < δ.
   - G3: n = ⌈p̂_A·(z₀.₉₅ + z₀.₈₀)² / (d̂ + δ_A)²⌉ when d̂ > −δ_A, with p̂_A the automation discordance.
@@ -233,7 +232,7 @@ Each candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals
 |---|---|---|
 | Pilot (M3) | `pilot` | all five, plus `luna-none` in implicit cache mode for the caching comparison |
 | Dev (M4) | `dev` | `inc` first (§3.4); then `luna-none`, `luna-low`, `haiku55-off`, `haiku55-low`; then D-X iterations |
-| Cert (M5) | `cert` | `inc`, the four candidates, `luna-none-x`; plus `inc` again on `aa` |
+| Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-none-x`, `luna-low`; Anthropic `haiku55-off`, `haiku55-low`. Exactly one run per configuration and split under a contract tag (§9.5) |
 
 ### 9.2 Errors and retries
 
@@ -261,8 +260,9 @@ Each candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals
 - **Caps:** `config/budget.yaml` caps each provider at $10.
 - **Spent:** the cost of every attempt and warm-up across all run records. An attempt that timed out is charged as full uncached input plus max output tokens.
 - **Projection before the freeze (M4):** spent + every remaining planned run × per-item p90 cost from that configuration's `dev` run (`luna-none-x` uses its selected iteration).
-- **Drop order:** if the projection exceeds a cap, planned `cert` runs are dropped in this order until it fits: `luna-low`, `haiku55-low`, `luna-none-x`. The resulting plan is written into the contract, and dropped decisions are reported as "not run (budget)".
-- **In-run stop:** a run stops when spent reaches cap − $0.50. The run is marked incomplete and its decisions become INCONCLUSIVE (insufficient data).
+- **Drop order:** if the projection exceeds a cap, planned `cert` runs are dropped in this order until it fits: `luna-low`, `haiku55-low`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are reported as "not run (budget)"; a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
+- **In-run stop:** a run stops when spent reaches cap − $0.50 and is marked incomplete; later runs for that provider do not start. Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
+- **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
 
 ## 10. Records
@@ -282,14 +282,14 @@ Each candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals
 
 ### `runs/manifest.yaml`
 
-For each decision: the run IDs of incumbent, candidate and `aa`. `decide` refuses if a run's configuration, prompt, schema or item-list hash differs from the contract, or if its contract tag commit is missing.
+Written by the runner (§9.5), never by hand: for each configuration and split under the contract tag, its single run ID. `decide` refuses if a run's configuration, prompt, schema or item-list hash differs from the contract, if its contract tag commit is missing, or if a `cert`/`aa` run directory for that tag is absent from the manifest.
 
 ### Other files
 
 - **`config/prices.yaml`:** price per model and token class, with source URL and retrieval date. Cost is always computed from it.
 - **`decisions/<decision_id>.md`** (generated):
   - verdict and conditions;
-  - gate table (estimate, bootstrap bound, normal bound, margin, status) and family-adjusted status;
+  - gate table (estimate, Tango bound, Wald bound, margin, status) and family-adjusted status;
   - slice table;
   - naive-swap table;
   - up to 20 messages that became `wrong_auto` under the candidate, in digest order;

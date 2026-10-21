@@ -7,10 +7,10 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | ID | Test | Spec |
 |---|---|---|
 | T-D1 | Download verifies both SHA-256 values; a corrupted file fails with a clear error | §2.1 |
-| T-D2 | Splits reproduce exactly: 250 `examples`, 3,075 `dev` (1,075 OOS), 9,758 `cert`, 100 `pilot` ⊂ `dev`, 3,080 `aa` ⊂ `cert`. `examples`, `dev` and `cert` are pairwise disjoint and together cover all 13,083 rows | §2.3 |
+| T-D2 | Splits reproduce exactly: 250 `examples`, 3,075 `dev` (1,075 OOS), 9,758 `cert`, 3,080 `aa` ⊂ `cert`. `pilot` ⊂ `dev` has 100 items: one per in-scope intent plus 50 OOS. `examples`, `dev` and `cert` are pairwise disjoint and together cover all 13,083 rows | §2.3 |
 | T-D3 | `cert` slice sizes equal the §2.3 table and `analysis/power.py` `CERT_SLICES` | §2.3, §2.4 |
 | T-D4 | Intent groups: 50 in-scope intents, each in exactly one group; 27 OOS; union = the 77 Banking77 intents | §2.2, §2.4 |
-| T-D5 | Prompt: the catalog has exactly the 50 in-scope IDs. No OOS name occurs as a whole token, matched with `(?<![A-Za-z0-9_?])name(?![A-Za-z0-9_?])` and also in its space-separated form, so `exchange_rate` inside `card_payment_wrong_exchange_rate` is not a hit. Stable prefix ≥ 1,100 `o200k_base` tokens. The user message is the raw customer text | §3.1 |
+| T-D5 | Prompt: the catalog has exactly the 50 in-scope IDs. No OOS name occurs anywhere as a whole token, matched with `(?<![A-Za-z0-9_?])name(?![A-Za-z0-9_?])`, so `exchange_rate` inside `card_payment_wrong_exchange_rate` is not a hit. The instruction text also contains no OOS name in its space-separated form; descriptions and examples are exempt from that check because in-scope intents legitimately talk about "exchange rate". Stable prefix ≥ 1,100 `o200k_base` tokens. The user message is the raw customer text | §3.1 |
 | T-D6 | Leakage: no casefolded, whitespace-collapsed `cert` or `dev` text equals any prompt sentence or example. Every example comes from `examples`. Short accidental phrase hits need an allowlist entry with a reason | §2.5 |
 
 ## 2. Parsing, outcomes, metrics, thresholds, cost (M1–M2)
@@ -32,11 +32,10 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 
 | ID | Test | Spec |
 |---|---|---|
-| T-S1 | Bootstrap bound vs normal approximation on constructed counts at n ≥ 5,000: within 0.05 pp | §7.4 |
-| T-S2 | Multinomial-cell bootstrap and item-level bootstrap on the same 2,000-item constructed sample: bounds within 0.1 pp (equivalence of the shortcut) | §7.4 |
-| T-S3 | False release: true difference = margin, p_disc ∈ {0.03, 0.08}, the §2.3 slice sizes, δ_W = 0.50 pp and δ_S = 2.0 pp. G1 alone and one G2 slice alone each certify in ≤ 5% + 2 Monte Carlo SE of 4,000 simulated runs. If the percentile bootstrap exceeds this, the bound method is changed before M3 and the spec updated | §7.1 |
-| T-S4 | Power: true difference = 0, same inputs; certification rate within ±3 pp of `analysis/power.py` without calibration noise | §7.3 |
-| T-S5 | The stratified overall draw keeps each slice's size in every resample | §7.4 |
+| T-S1 | Tango score: the statistic is 0 at d = (n10 − n01)/n; the restricted MLE solves its likelihood equation within 1e-9; the inverted bound satisfies T(bound) = −z within 1e-9; at n ≥ 5,000 the Tango and Wald bounds agree within 0.05 pp | §7.1, §7.4 |
+| T-S2 | Edge cases: zero discordant pairs, all discordant pairs on one side, n10 = n01; the bound stays finite and the gate status is defined | §7.1 |
+| T-S3 | False release: true difference = margin, p_disc ∈ {0.03, 0.08}, the §2.3 slice sizes, δ_W = 0.50 pp and δ_S = 2.0 pp. G1 alone and every G2 slice alone each certify in ≤ 5% + 2 Monte Carlo SE of 16,000 simulated runs | §7.1 |
+| T-S4 | Power: true difference = 0, same inputs; the gate code's certification rate equals `analysis/power.py` without calibration noise within ±1.5 pp (both use the Tango test) | §7.3 |
 | T-S6 | Sample size: G1/G2 and G3 formulas equal the closed forms, with the correct direction for G3; "not reachable" on the wrong side of the margin | §7.4 |
 | T-S7 | On constructed runs, the cluster bootstrap reports a status change when intents are heterogeneous; the A/A comparison flags FAIL on a constructed unstable incumbent | §7.4, §7.6 |
 | T-M2 | Margin selection from a fixture `dev.json`: `power.py` selects the first pair meeting 80% in δ_W-then-δ_S order, applies the 1% floor, and exits 2 with the fallback when none qualifies | §7.3 |
@@ -54,10 +53,11 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-R4 | Runner with a fake provider: concurrency ≤ 16; the configured RPM is never exceeded over any 60 s window; warm-ups (16 for `inc`) complete before the fan-out | §4, §9.4 |
 | T-R5 | Resume: a killed run with a partial last line resumes with the same `run_id`; no item is requested twice and the finalized file has exactly one row per item. A new `run_id` requests every item | §9.3 |
 | T-R6 | Budget: the pre-freeze projection over all planned runs applies the drop order; a run that is not affordable does not start; a run stops at cap − $0.50 and is marked incomplete | §9.5 |
-| T-R7 | Freeze guard: a `cert` run refuses without the tag or with a modified file under `src/`, `prompts/`, `config/`, `contracts/` or `analysis/`. It starts when only `runs/` changed, including with an earlier run directory present and when resuming a partial run | §9.5 |
+| T-R7 | Freeze guard: a `cert` run refuses without the tag or with a modified file under `src/`, `prompts/`, `config/`, `contracts/` or `analysis/`. It starts when only `runs/` changed, including with an earlier run directory present and when resuming a partial run. A second new `run_id` for the same configuration and split under the tag is refused; resume and `--retry-errors` are allowed | §9.5 |
 | T-R8 | `decide` refuses a run whose API error rate is > 0.5%; after one `--retry-errors` pass it accepts only if the rate is ≤ 0.5% | §9.2 |
 | T-R9 | Records validate against the §10 field lists; ground truth is absent from item rows | §10 |
-| T-R10 | `decide` refuses a manifest entry whose configuration, prompt, schema or item-list hash, or contract tag commit, does not match the contract | §10 |
+| T-R10 | The runner appends each `cert`/`aa` run to `runs/manifest.yaml` at start. `decide` refuses a manifest entry whose configuration, prompt, schema or item-list hash, or contract tag commit, does not match the contract, and refuses when a run directory under the tag is missing from the manifest | §9.5, §10 |
+| T-R11 | `cert` run order and drop order: the planner orders runs as §9.1, drops `luna-low`, `haiku55-low`, `luna-none-x`, `aa` in that order, and stops a provider's M5 when the projection still exceeds its cap; after an in-run stop no later run for that provider starts | §9.1, §9.5 |
 
 ## 5. Pilot acceptance (M3, live, ≈ $0.15)
 
