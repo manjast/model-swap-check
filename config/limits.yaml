@@ -1,0 +1,23 @@
+# Rate limits per provider (spec §9.4), enforced by a sliding window in the limit's own unit.
+# Values are 80% of the account limits. These initial values are placeholders: the M3 pilot
+# replaces them from response headers (OpenAI `x-ratelimit-limit-*`, Anthropic
+# `anthropic-ratelimit-*`) and, for TypeSafe, from its console (no header is documented).
+# `tokens` is compared with the per-request estimate: o200k_base tokens of the developer
+# message + the customer text, plus max output tokens for OpenAI (which counts them).
+# A provider may list per-model overrides under `models`.
+
+openai:
+  per: minute
+  requests: 400
+  tokens: 400000
+
+anthropic:
+  # 80% of Start tier: 1,000 RPM and 2,000,000 input tokens per minute
+  per: minute
+  requests: 800
+  tokens: 1600000
+
+typesafe:
+  per: second
+  requests: 5
+  tokens: 20000

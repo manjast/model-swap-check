@@ -1,0 +1,9 @@
+# Spend caps per provider, USD (spec §9.5). Spent = cost of every attempt and warm-up in runs/,
+# priced with config/prices.yaml. No run may take a provider's spend past cap - reserve_margin_usd.
+
+caps_usd:
+  openai: 10.0
+  anthropic: 10.0
+  typesafe: 5.0
+
+reserve_margin_usd: 0.50

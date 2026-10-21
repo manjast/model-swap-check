@@ -125,9 +125,9 @@ API errors are handled in §7.4, not by this policy.
 | ID | API | Model | Reasoning / thinking | Temperature | Max output tokens | Caching |
 |---|---|---|---|---|---|---|
 | `inc` | OpenAI Responses | `gpt-4o-mini-2024-07-18` | none (no reasoning model) | 0 | 100 | implicit (automatic); `prompt_cache_key` = `msc-<int(digest, 16) mod 16>` |
-| `luna-none` | OpenAI Responses | `gpt-6-luna` | `reasoning.effort: none` | 0 if accepted, else omitted *(pilot)* | 200 | `prompt_cache_options.mode: explicit`, one breakpoint at the end of the developer message, TTL `30m` |
-| `luna-low` | same | `gpt-6-luna` | `reasoning.effort: low` | as accepted at this effort *(pilot)* | 1,024 | same |
-| `luna-medium` | same | `gpt-6-luna` | `reasoning.effort: medium` (the model's default) | as accepted *(pilot)* | 4,096 | same |
+| `luna-none` | OpenAI Responses | `gpt-6-luna` | `reasoning.effort: none` | 0 (allowed only at effort `none`, per OpenAI's GPT-6 guide; confirmed in the pilot) | 200 | `prompt_cache_options: {mode: explicit, ttl: 30m}`, one `prompt_cache_breakpoint` on the developer message's text part |
+| `luna-low` | same | `gpt-6-luna` | `reasoning.effort: low` | omitted (rejected when effort is not `none`) | 1,024 | same |
+| `luna-medium` | same | `gpt-6-luna` | `reasoning.effort: medium` (the model's default) | omitted | 4,096 | same |
 | `haiku55-off` | Anthropic Messages | `claude-haiku-5-5` | `thinking: disabled`, `output_config.effort: low` | omitted (rejected by API) | 200 | `cache_control: ephemeral` on the system block; no top-level `cache_control` |
 | `haiku55-low` | same | `claude-haiku-5-5` | adaptive thinking, `output_config.effort: low` | omitted | 1,024 | same |
 | `haiku55-medium` | same | `claude-haiku-5-5` | adaptive thinking, `output_config.effort: medium` (the model's default) | omitted | 4,096 | same |
@@ -294,7 +294,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 ### 9.2 Errors and retries
 
 - **Retried:** connection errors, timeouts (60 s), HTTP 408, 409, 429, 500, 502, 503, 504, 529. Exponential backoff from 1 s, ×2, full jitter, honouring `retry-after`, at most 6 attempts.
-- **Not retried:** 400, 401, 403, 404, 422 → `api_error`.
+- **Not retried:** 400, 401, 403, 404, 422 → `api_error`; also a 429 whose body reports an exhausted quota or spend limit (OpenAI `insufficient_quota` and the spend/credit-limit codes), which retrying cannot fix.
 - **`invalid_output` (LLMs):** refusal stop reason, truncation at max tokens, unparseable JSON, intent not in the enum after case-insensitive matching, confidence missing or outside [0, 1].
 - **`invalid_output` (Jev):** a missing or extra answer key; a `choice` outside the criteria keys; `confidence` or Noul probability missing or outside [0, 1]; `probabilities` missing or summing outside 1 ± 0.01. A 400 (including `max_tokens_exceeded`) is `api_error`.
 - **Validity threshold:** a run is valid for `decide` only if its API error rate is ≤ 0.5%.
@@ -310,7 +310,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 ### 9.4 Rate limits and latency
 
 - **Limits file:** `config/limits.yaml` holds, per provider and model, request and token limits with an explicit unit (per minute or per second). Values are 80% of the account limits: OpenAI and Anthropic per minute, read from response headers in the pilot (`x-ratelimit-limit-*`, `anthropic-ratelimit-*`); TypeSafe per second, entered from its console because no header is documented.
-- **Enforcement:** a token bucket per provider that refills in the limit's own unit, so a per-second limit is never exceeded in any 1 s window. 429 responses are counted per run.
+- **Enforcement:** a sliding-window limiter per provider in the limit's own unit: a request starts only if the requests and estimated tokens of the last window (60 s or 1 s), plus its own, stay within the limit. So no limit is exceeded in any window. 429 responses are counted per run.
 - **Latency:** monotonic wall-clock time of the final attempt, non-streamed, at concurrency 16, from this machine. Reported as p50/p95 overall and split by calls with and without cache reads. Provider timing headers are stored where available. Indicative only.
 
 ### 9.5 Budget and freeze guards
@@ -319,7 +319,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 - **Spent:** the cost of every attempt and warm-up across all run records. An attempt that timed out is charged as full uncached input plus max output tokens.
 - **Pre-`dev` gate (after the pilot):** spent + every planned `dev` run + the mandatory `cert` runs (`inc`, `luna-none`, `aa` for OpenAI; `haiku55-off` for Anthropic), each × per-item p90 cost from the pilot, must stay ≤ cap − $0.50. If not, the `*-medium` `dev` run of that vendor is skipped, then `*-low`. Each `dev` run gets a spend ceiling that keeps the mandatory `cert` reserve; reaching it stops the run as incomplete without affecting later runs.
 - **Projection before the freeze (M4):** spent + every remaining planned run × per-item p90 cost from that configuration's `dev` run (`luna-none-x` uses its selected iteration).
-- **Drop order:** if the projection exceeds a cap, first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
+- **Drop order:** if the projection exceeds cap − $0.50 (the in-run stop level, so a plan that fits is never cut short), first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
 - **In-run stop:** a run stops when spent reaches cap − $0.50 and is marked incomplete; later runs for that provider do not start. Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
 - **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
@@ -329,7 +329,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 ### `runs/<run_id>/run.json`
 
 - **Identity:** run ID, configuration ID and hash, split, item-list hash, prompt hash, schema hash.
-- **Environment:** requested model, returned model IDs, SDK versions, git commit, contract tag commit.
+- **Environment:** requested model, returned model IDs, versions (Python, `httpx`, `swapcheck`, the Anthropic API version header), git commit, contract tag commit.
 - **Run log:** warm-ups with usage, start and end times, `--retry-errors` count, 429 count.
 - **Totals:** counts by status, tokens by class, billed cost.
 
@@ -358,7 +358,7 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
 
 ## 11. Cost model and reporting
 
-- **Cost model:** per configuration, the mean and p90 token counts per class (uncached input, cache read, cache write, output, reasoning) measured in the pilot, and then in `dev`, multiplied by `config/prices.yaml`. It drives the budget guard and test T-L4.
+- **Cost model:** per configuration, the mean and p90 token counts per class (uncached input, cache read, cache write, output, reasoning) per item, summed over the item's attempts (so retries and timeout charges count), measured in the pilot and then in `dev`, multiplied by `config/prices.yaml`. Percentiles use `numpy.quantile(method="higher")`. It drives the budget guard and test T-L4.
 - **Reported per configuration**, as cost per 1,000 messages:
   - billed, from all attempts;
   - steady traffic, with the shared prefix read from cache on every call;
@@ -376,7 +376,7 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 
 ## 12. Repository and workflow
 
-- **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`openai`, `anthropic`, `typesafe-sdk`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`).
+- **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The three APIs are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
 - **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev translation, `--check` in CI), `run`, `decide`, `report`.
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
@@ -398,13 +398,13 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 
 | Item | Resolved at |
 |---|---|
-| `gpt-6-luna` accepts `temperature` at effort `none` and at `low`? | pilot |
+| `gpt-6-luna` accepts `temperature: 0` at effort `none` (documented; confirmed on the first call) | pilot |
 | structured outputs with a 51-value enum on all configurations | pilot |
 | `gpt-4o-mini` callable from this API account | first pilot call |
 | Luna explicit vs implicit cache mode: reads, writes, billed cost on the same 100 items | pilot |
 | token overhead of Claude's injected structured-output instructions | pilot |
 | reasoning/thinking tokens per item at `low` and `medium` (drives the budget) | pilot |
 | account rate limits per provider (OpenAI, Anthropic per minute; TypeSafe per second) | pilot (response headers and console) |
-| OpenAI server timing header available through the SDK | pilot |
+| OpenAI server timing header (`openai-processing-ms`, documented) present on Responses calls | pilot |
 | Jev option-order sensitivity, per design: share of pilot items whose choice changes when the 50 intents are reversed (`out_of_scope` kept last) | pilot (reported; a share > 5% for the selected design is stated as a limitation in the D-J record) |
-| Jev latency from this machine (TypeSafe reports 70–500 ms from its own US West Coast location) | pilot |
+| Jev latency from this machine (TypeSafe's docs: "most queries complete in about 100 ms", measured at its own location) | pilot |
