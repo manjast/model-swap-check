@@ -1,0 +1,95 @@
+# Configurations under test (spec §4). Each entry's hash is the SHA-256 of its canonical JSON
+# (see swapcheck.configs). Values marked (pilot) may be changed by the M3 pilot, with the reason
+# written in docs/pilot.md, before any dev run.
+
+configurations:
+  inc:
+    provider: openai
+    model: gpt-4o-mini-2024-07-18
+    temperature: 0
+    max_output_tokens: 100
+    cache_mode: implicit
+    prompt_cache_keys: 16
+
+  luna-none:
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: none
+    temperature: 0  # accepted only at effort none (OpenAI GPT-6 guide); confirmed by the pilot
+    max_output_tokens: 200
+    cache_mode: explicit
+    cache_ttl: 30m
+
+  luna-low:
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    # no temperature: rejected when reasoning effort is not none (OpenAI GPT-6 guide)
+    max_output_tokens: 1024
+    cache_mode: explicit
+    cache_ttl: 30m
+
+  luna-medium:
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: medium
+    # no temperature: rejected when reasoning effort is not none
+    max_output_tokens: 4096
+    cache_mode: explicit
+    cache_ttl: 30m
+
+  haiku55-off:
+    provider: anthropic
+    model: claude-haiku-5-5
+    thinking: disabled
+    effort: low
+    max_output_tokens: 200
+    cache_mode: system_block
+
+  haiku55-low:
+    provider: anthropic
+    model: claude-haiku-5-5
+    thinking: adaptive
+    effort: low
+    max_output_tokens: 1024
+    cache_mode: system_block
+
+  haiku55-medium:
+    provider: anthropic
+    model: claude-haiku-5-5
+    thinking: adaptive
+    effort: medium
+    max_output_tokens: 4096
+    cache_mode: system_block
+
+  jev-c51:
+    provider: typesafe
+    model: jev-1.13.0
+    jev_design: c51
+
+  jev-noul:
+    provider: typesafe
+    model: jev-1.13.0
+    jev_design: noul
+
+  luna-none-x:
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: none
+    temperature: 0  # follows luna-none
+    max_output_tokens: 200
+    cache_mode: explicit
+    cache_ttl: 30m
+    prompt: prompts/luna-none-x.md  # written at M4 (spec §8.3)
+
+# Pilot-only variants (spec §9.1): caching comparison and Jev option-order sensitivity.
+pilot_variants:
+  luna-none-implicit:
+    base: luna-none
+    cache_mode: implicit
+  jev-c51-reversed:
+    base: jev-c51
+    option_order: reversed
+  jev-noul-reversed:
+    base: jev-noul
+    option_order: reversed

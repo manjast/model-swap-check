@@ -1,0 +1,58 @@
+{
+  "config_id": "inc",
+  "http_status": 200,
+  "headers": {
+    "x-request-id": "req_inc_ok_0001",
+    "openai-processing-ms": "412",
+    "openai-version": "2020-10-01",
+    "x-ratelimit-limit-requests": "30000",
+    "x-ratelimit-remaining-requests": "29999",
+    "x-ratelimit-reset-requests": "2ms",
+    "x-ratelimit-limit-tokens": "150000000",
+    "x-ratelimit-remaining-tokens": "149997600",
+    "x-ratelimit-reset-tokens": "0s",
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "resp_1234567890",
+    "object": "response",
+    "created_at": 1792540800,
+    "status": "completed",
+    "completed_at": 1792540801,
+    "error": null,
+    "incomplete_details": null,
+    "instructions": null,
+    "model": "gpt-4o-mini-2024-07-18",
+    "output": [
+      {
+        "id": "msg_1234567890",
+        "type": "message",
+        "status": "completed",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"intent\":\"card_arrival\",\"confidence\":0.93}",
+            "annotations": [],
+            "logprobs": []
+          }
+        ]
+      }
+    ],
+    "reasoning": {
+      "effort": null
+    },
+    "store": false,
+    "usage": {
+      "input_tokens": 2210,
+      "input_tokens_details": {
+        "cached_tokens": 1920
+      },
+      "output_tokens": 14,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 2224
+    }
+  }
+}

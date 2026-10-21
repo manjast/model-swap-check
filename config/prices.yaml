@@ -1,0 +1,39 @@
+# Prices per model and token class, USD per 1M tokens, Standard tier (spec §10, §11).
+# Every cost in this project (spend guard, cost model, decision records) is computed from this file.
+# Classes follow `swapcheck.records.Usage`: each input token is billed at exactly one of
+# uncached_input, cache_read or cache_write; `output` includes reasoning/thinking tokens.
+
+retrieved: 2026-10-21
+
+models:
+  gpt-6-luna:
+    uncached_input: 0.10
+    cache_read: 0.01
+    cache_write: 0.125  # 30m TTL (1.25x input); 12h writes would be 0.25, not used (spec §4)
+    output: 0.50
+    source: https://developers.openai.com/api/docs/pricing.md
+    # Requests over 272K input tokens are priced higher (0.20 / 0.02 / 0.25 / 0.75); not reachable here
+    # (stable prefix of a few thousand tokens plus one short customer message).
+
+  gpt-4o-mini-2024-07-18:
+    uncached_input: 0.15
+    cache_read: 0.075
+    cache_write: 0.0  # no write charge on pre-5.6 models; implicit-cache writes are not reported
+    output: 0.60
+    source: https://developers.openai.com/api/docs/pricing.md
+
+  claude-haiku-5-5:
+    uncached_input: 0.10
+    cache_read: 0.01
+    cache_write: 0.125  # 5m ephemeral cache (1.25x input)
+    output: 0.50  # including thinking
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    # Prompts over 100,000 input tokens (incl. cache reads and writes) are priced 5x; not reachable here
+    # (stable prefix of a few thousand tokens plus one short customer message).
+
+  jev-1.13.0:
+    uncached_input: 0.042  # "You pay per input token"
+    cache_read: 0.0  # no caching
+    cache_write: 0.0
+    output: 0.0  # "Output tokens are free"
+    source: https://docs.typesafe.ai/models.md

@@ -1,0 +1,74 @@
+{
+  "config_id": "jev-noul",
+  "http_status": 200,
+  "headers": {
+    "x-typesafe-request-id": "ts_req_missing_0003",
+    "content-type": "application/json"
+  },
+  "body": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "intent": {
+        "type": "choice",
+        "choice": "Refund_not_showing_up",
+        "confidence": 0.7959,
+        "probabilities": {
+          "activate_my_card": 0.004082,
+          "apple_pay_or_google_pay": 0.004082,
+          "automatic_top_up": 0.004082,
+          "balance_not_updated_after_bank_transfer": 0.004082,
+          "balance_not_updated_after_cheque_or_cash_deposit": 0.004082,
+          "beneficiary_not_allowed": 0.004082,
+          "cancel_transfer": 0.004082,
+          "card_about_to_expire": 0.004082,
+          "card_arrival": 0.004082,
+          "card_linking": 0.004082,
+          "card_payment_fee_charged": 0.004082,
+          "card_payment_not_recognised": 0.004082,
+          "card_payment_wrong_exchange_rate": 0.004082,
+          "cash_withdrawal_charge": 0.004082,
+          "cash_withdrawal_not_recognised": 0.004082,
+          "change_pin": 0.004082,
+          "country_support": 0.004082,
+          "declined_card_payment": 0.004082,
+          "declined_cash_withdrawal": 0.004082,
+          "declined_transfer": 0.004082,
+          "direct_debit_payment_not_recognised": 0.004082,
+          "disposable_card_limits": 0.004082,
+          "edit_personal_details": 0.004082,
+          "exchange_charge": 0.004082,
+          "exchange_via_app": 0.004082,
+          "extra_charge_on_statement": 0.004082,
+          "failed_transfer": 0.004082,
+          "fiat_currency_support": 0.004082,
+          "getting_spare_card": 0.004082,
+          "lost_or_stolen_phone": 0.004082,
+          "order_physical_card": 0.004082,
+          "pending_card_payment": 0.004082,
+          "pending_cash_withdrawal": 0.004082,
+          "pending_top_up": 0.004082,
+          "pending_transfer": 0.004082,
+          "Refund_not_showing_up": 0.799982,
+          "request_refund": 0.004082,
+          "reverted_card_payment?": 0.004082,
+          "supported_cards_and_currencies": 0.004082,
+          "top_up_failed": 0.004082,
+          "top_up_reverted": 0.004082,
+          "transaction_charged_twice": 0.004082,
+          "transfer_fee_charged": 0.004082,
+          "transfer_not_received_by_recipient": 0.004082,
+          "transfer_timing": 0.004082,
+          "verify_top_up": 0.004082,
+          "visa_or_mastercard": 0.004082,
+          "why_verify_identity": 0.004082,
+          "wrong_amount_of_cash_received": 0.004082,
+          "wrong_exchange_rate_for_cash_withdrawal": 0.004082
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 3410,
+      "output_tokens": 34
+    }
+  }
+}
