@@ -25,7 +25,9 @@ Which of them can take over without routing more messages wrongly, and at which 
 
 A migration here always includes recalibrating the confidence threshold on `dev` (§6); that is part of each candidate. Swapping only the model ID is reported descriptively (§7.5), without a verdict. Candidates are compared with the incumbent at its production setting, whatever their own reasoning level: `gpt-4o-mini` has no reasoning setting.
 
-**Not tested:** reasoning efforts above `medium`; Claude Haiku 4.5; `gpt-4.1-mini` (same shutdown date and named successor as `gpt-4o-mini`); Jev 1.14 (`jev-preview`) and other decision models (Laya, Kev); multi-turn conversations; languages other than English; streaming; real production traffic.
+**Deployment assumption:** the router triages support messages into team queues (asynchronous, as with Banking77's single-turn app support queries). A second of model time does not affect the customer there, so latency is reported and flagged, never gated. A live-chat or voice entry point would need a latency limit; this project does not test that use, because latency measured from a phone over a mobile network cannot carry a hard limit.
+
+**Not tested:** reasoning efforts above `medium`; Claude Haiku 4.5; `gpt-4.1-mini` (same shutdown date and named successor as `gpt-4o-mini`); Jev 1.14 (`jev-preview`) and other decision models (Laya, Kev); live-chat latency limits; multi-turn conversations; languages other than English; streaming; real production traffic.
 
 ## 2. Data
 
@@ -197,7 +199,7 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 - **Harm side:** corrected over the 7 slices (G2 FAIL rule).
 - **Family-adjusted status:** each decision record also reports the gates at U and L for one-sided 1 − 0.05/6 (Bonferroni over the 6 decisions). This answers "is any of the options safe?", which is the question a reader picking the best option implicitly asks. Decisions not run do not reduce the divisor.
 - **Noise floor rule:** if the A/A comparison (§7.6) is FAIL on G1 or G2, every verdict becomes INCONCLUSIVE with that reason.
-- **Cost and latency** are reported, not gated: the verdict is about routing quality, and latency is measured client-side from a phone. Two flags never change the verdict: `COST` if steady-traffic cost > 1.5× the incumbent's, `LATENCY` if p95 > 2× the incumbent's.
+- **Cost and latency** are reported, not gated (deployment assumption, §1). Two flags never change the verdict: `COST` if steady-traffic cost > 1.5× the incumbent's, `LATENCY` if p95 > 2× the incumbent's. Reasoning/thinking tokens per message are reported next to latency as a speed measure that does not depend on our network.
 
 ### 7.3 Margins *(M4)*
 
@@ -244,17 +246,26 @@ Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% inter
 
 ## 8. Selections made on `dev`
 
-All three selections use weighted `dev` metrics at each configuration's own τ (§6), are logged with their numbers, and are frozen in the contract. A values are computed exactly with `fractions.Fraction` (the weights are ratios of counts) and compared exactly, so boundary cases do not depend on floating-point summation order.
+All three selections use weighted `dev` metrics at each configuration's own τ (§6), are logged with their numbers, and are frozen in the contract. In §8.2 and §8.3, A values are computed exactly with `fractions.Fraction` (the weights are ratios of counts) and compared exactly, so boundary cases do not depend on floating-point summation order.
 
 ### 8.1 Reasoning effort (D-A2, D-B2)
 
-For each vendor, with A = weighted `dev` automation rate and `none/off` the no-reasoning configuration:
+**Why this rule.** Reasoning at `medium` costs about $0.0005 per message, far less than the value of one more message routed without a person. So any real automation gain pays for itself, and the only thing a threshold has to guard against is noise. With about 3,075 `dev` items, the noise in a paired difference is roughly ±0.4–0.6 pp; the bound below adapts to the noise actually observed instead of a fixed number of points.
 
-- **Qualifying levels:** E = the levels in {`low`, `medium`} with A(level) − A(none/off) ≥ 1.0 pp.
-- **Selection:** if E is empty, D-A2/D-B2 is NOT RUN (`no dev gain`), reported with the `dev` numbers. Otherwise `R` = `medium` if `medium` ∈ E and (`low` ∉ E or A(`medium`) − A(`low`) ≥ 1.0 pp); else `R` = `low`. The cheaper level wins unless the dearer one buys a clear gain.
+**Gain test.** For two configurations X and Y of one vendor, each at its own τ:
+
+- **Per-item difference:** d_i = auto_X,i − auto_Y,i ∈ {−1, 0, 1}, with the §5 weights w_i (summing to 1).
+- **Mean and spread:** d̄ = Σ w_i d_i and SE = √(Σ w_i² (d_i − d̄)²), both computed with `math.fsum` in item-ID order.
+- **Verdict:** X *really gains* over Y iff d̄ − 1.2816 · SE > 0 (one-sided 90% lower bound; 0 itself does not count).
+
+**Selection**, with `none/off` the no-reasoning configuration:
+
+- **Qualifying levels:** E = the levels in {`low`, `medium`} that really gain over `none/off`.
+- **Choice:** if E is empty, D-A2/D-B2 is NOT RUN (`no dev gain`), reported with the `dev` numbers. Otherwise `R` = `medium` if `medium` ∈ E and (`low` ∉ E or `medium` really gains over `low`); else `R` = `low`. The cheaper level wins unless the dearer one shows a real gain.
 - **Budget substitution:** if §9.5 would drop `R` = `medium` for budget and `low` ∈ E, `low` replaces it before anything is dropped; the substitution is recorded in the contract.
 - **Always certified:** the no-reasoning configuration (`luna-none`, `haiku55-off`), the cheapest and fastest option.
 - **Skipped `dev` runs:** a level whose `dev` run was skipped by the pre-`dev` budget gate (§9.5) is not in E.
+- **Not peeking:** this rule is fixed before any `dev` run. Results seen early in the `dev` order (the incumbent, Jev) do not change it.
 
 ### 8.2 Jev request design (D-J)
 
@@ -275,7 +286,7 @@ For each vendor, with A = weighted `dev` automation rate and `none/off` the no-r
 | Phase | Split | Configurations |
 |---|---|---|
 | Pilot (M3) | `pilot` | all ten configurations in §4 except `luna-none-x`; plus `luna-none` in implicit cache mode (caching comparison) and both Jev designs with reversed option order (order sensitivity) |
-| Dev (M4) | `dev` | `inc` first (§3.4); then `luna-none`, `luna-low`, D-X iterations, `luna-medium`; `haiku55-off`, `haiku55-low`, `haiku55-medium`; `jev-c51`, `jev-noul`. Medium runs come last per vendor and may be skipped by the pre-`dev` budget gate (§9.5) |
+| Dev (M4) | `dev` | in this order: `inc` (§3.4 first); `jev-c51`, `jev-noul`; `luna-none`, `haiku55-off`; `luna-low`, `haiku55-low`; D-X iterations; `luna-medium`, `haiku55-medium` last, after the pre-`dev` budget gate (§9.5) may skip them |
 | Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-none-x`, `luna-R`; Anthropic `haiku55-off`, `haiku55-R`; TypeSafe `jev-D`. `R` runs only if §8.1 certifies it. Exactly one run per configuration and split under a contract tag (§9.5) |
 
 ### 9.2 Errors and retries
