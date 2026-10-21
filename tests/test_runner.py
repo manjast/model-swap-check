@@ -12,6 +12,7 @@ import httpx
 import pytest
 from fakes import (
     FakeClock,
+    Handler,
     clone_repo,
     cost,
     items,
@@ -20,6 +21,7 @@ from fakes import (
     ok_body,
     ok_handler,
     request_text,
+    reservation,
     retry_sync,
     run_sync,
 )
@@ -28,7 +30,17 @@ from swapcheck.configs import Configuration, load_configurations
 from swapcheck.prompt import Prompt
 from swapcheck.providers.base import WARMUP_TEXT
 from swapcheck.ratelimit import Limit, RateLimiter
-from swapcheck.records import ITEMS_FINAL, ITEMS_PLAIN, ItemRow, RunMeta, RunTotals, Usage, read_meta, read_rows
+from swapcheck.records import (
+    ITEMS_FINAL,
+    ITEMS_PLAIN,
+    ITEMS_RETRY,
+    ItemRow,
+    RunMeta,
+    RunTotals,
+    Usage,
+    read_meta,
+    read_rows,
+)
 from swapcheck.runner import BudgetExceeded, RunBudget, RunnerError, run_validity
 
 CONFIGS = load_configurations()
@@ -433,3 +445,145 @@ def test_r9_finalized_rows_are_byte_identical_across_runs(incumbent: Prompt, rep
     run_sync(cfg, incumbent, "dev", its, ok_handler(), repo, run_id="b")
     a, b = (repo / "runs" / name / ITEMS_FINAL for name in "ab")
     assert a.read_bytes() == b.read_bytes()
+
+
+# --- Spend admission per attempt (spec §9.5) -------------------------------------------------------
+
+TIMEOUT_USD = reservation("")  # $0.0022: the fake timeout charge, also the fake per-attempt reservation
+
+
+def times_out(texts: set[str] | None = None) -> Handler:
+    """Every request (or every request for `texts`) times out; the rest succeed."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if texts is None or request_text(request) in texts:
+            raise httpx.ReadTimeout("slow", request=request)
+        return httpx.Response(200, json=ok_body())
+
+    return handler
+
+
+def test_r6_item_retries_are_admitted_per_attempt_and_never_overspend(incumbent: Prompt, repo: Path) -> None:
+    budget = RunBudget(spent_before_usd=0.0, ceiling_usd=0.01)
+    meta = run_sync(CONFIGS["jev-c51"], incumbent, "dev", items(4), times_out(), repo, run_id="r", budget=budget)
+    rows = read_rows(repo / "runs" / "r")
+    assert meta.totals.billed_usd <= budget.ceiling_usd
+    assert sum(len(r.attempts) for r in rows) == 4  # 4 x $0.0022 fit under $0.01; a fifth attempt would not
+    assert {r.error_code for r in rows} == {"budget"}
+    assert meta.complete is False and meta.incomplete_reason == "spend ceiling"
+
+
+def test_r6_warmup_retries_are_admitted_per_attempt(incumbent: Prompt, repo: Path) -> None:
+    budget = RunBudget(spent_before_usd=0.0, ceiling_usd=0.005)  # the warm-up and one item fit at the start
+    its = items(3)
+    meta = run_sync(
+        CONFIGS["luna-none"], incumbent, "dev", its, times_out({WARMUP_TEXT}), repo, run_id="r", budget=budget
+    )
+    assert [len(w.attempts) for w in meta.warmups] == [2]
+    assert meta.totals.billed_usd <= budget.ceiling_usd
+    assert read_rows(repo / "runs" / "r") == [] and meta.complete is False
+
+
+def test_r6_admission_holds_the_reservation_not_the_timeout_charge(incumbent: Prompt, repo: Path) -> None:
+    budget = RunBudget(spent_before_usd=0.0, ceiling_usd=0.01)
+    meta = run_sync(
+        CONFIGS["jev-c51"],
+        incumbent,
+        "dev",
+        items(10),
+        ok_handler(),
+        repo,
+        run_id="r",
+        budget=budget,
+        reservation_fn=lambda text: 0.004,
+    )
+    assert len(read_rows(repo / "runs" / "r")) == 2  # 2 x $0.004 held fit under $0.01, a third does not
+    assert meta.complete is False
+
+
+def test_r8_retry_pass_charges_only_its_own_attempts(incumbent: Prompt, repo: Path) -> None:
+    cfg, its = CONFIGS["jev-c51"], items(5)
+    run_dir = repo / "runs" / "r"
+    first = run_sync(cfg, incumbent, "dev", its, times_out({it.text for it in its[:3]}), repo, run_id="r")
+    assert first.totals.by_status["api_error"] == 3  # 6 timed-out attempts each, $0.0132 per row
+    spent = first.totals.billed_usd  # already includes those attempts, as `cost.spent_usd` does
+    budget = RunBudget(spent_before_usd=spent, ceiling_usd=spent + 3 * TIMEOUT_USD)  # one new attempt per row
+    meta = retry_sync(run_dir, cfg, incumbent, its, ok_handler(), repo, budget=budget, concurrency=1)
+    assert meta.retry_errors_rewritten == 3 and meta.totals.by_status["api_error"] == 0
+    assert [a.error for a in read_rows(run_dir)[0].attempts] == ["timeout"] * 6 + [None]  # full history kept
+
+
+# --- Durability: retry pass, partial lines, warm-ups (spec §9.3) ------------------------------------
+
+
+def test_r8_killed_retry_pass_resumes_without_a_second_pass(incumbent: Prompt, repo: Path) -> None:
+    cfg, its = CONFIGS["luna-none"], items(6)
+    run_dir = repo / "runs" / "r"
+    run_sync(cfg, incumbent, "dev", its, FailingFor({it.text for it in its[:3]}), repo, run_id="r")
+
+    async def dies_at_third(request: httpx.Request) -> httpx.Response:
+        if request_text(request) == its[2].text:
+            raise Killed
+        return httpx.Response(200, json=ok_body())
+
+    with pytest.raises(BaseExceptionGroup):
+        retry_sync(run_dir, cfg, incumbent, its, dies_at_third, repo, concurrency=1)
+    killed = read_meta(run_dir)
+    assert (killed.retry_errors_passes, killed.retry_errors_in_progress) == (1, True)
+    rows = read_rows(run_dir)
+    assert [r.status for r in rows[:3]] == ["ok", "ok", "api_error"]  # billed retries are on record
+    assert [a.http_status for a in rows[0].attempts] == [400, 200]
+    assert run_validity(killed, rows)[0] is False
+    with (run_dir / ITEMS_RETRY).open("ab") as f:
+        f.write('{"item_id": "test-2", "raw_output": "é'.encode()[:-1])  # killed mid-write
+
+    fixed = FailingFor(set())
+    meta = retry_sync(run_dir, cfg, incumbent, its, fixed, repo)
+    assert fixed.requested == [its[2].text]
+    assert (meta.retry_errors_passes, meta.retry_errors_rewritten, meta.retry_errors_in_progress) == (1, 3, False)
+    assert read_meta(run_dir) == meta and not (run_dir / ITEMS_RETRY).exists()
+    rows = read_rows(run_dir)
+    assert [r.status for r in rows] == ["ok"] * 6 and run_validity(meta, rows)[0] is True
+    assert [a.http_status for a in rows[0].attempts] == [400, 200]
+    with pytest.raises(RunnerError, match="already had its retry-errors pass"):
+        retry_sync(run_dir, cfg, incumbent, its, fixed, repo)
+
+
+def test_r5_partial_line_cut_inside_a_multibyte_character_is_ignored(incumbent: Prompt, repo: Path) -> None:
+    cfg, its = CONFIGS["luna-none"], items(6)
+    run_dir = repo / "runs" / "r"
+
+    async def dies_at_item_3(request: httpx.Request) -> httpx.Response:
+        if request_text(request) == its[3].text:
+            raise Killed
+        return httpx.Response(200, json=ok_body())
+
+    with pytest.raises(BaseExceptionGroup):
+        run_sync(cfg, incumbent, "dev", its, dies_at_item_3, repo, run_id="r", concurrency=1)
+    with (run_dir / ITEMS_PLAIN).open("ab") as f:
+        f.write('{"item_id": "test-3", "raw_output": "café'.encode()[:-1])  # cut inside "é"
+    assert [r.item_id for r in read_rows(run_dir)] == ["test-0", "test-1", "test-2"]
+    meta = run_sync(cfg, incumbent, "dev", its, ok_handler(), repo, run_id="r")
+    assert meta.complete and [r.item_id for r in read_rows(run_dir)] == [it.item_id for it in its]
+
+
+def test_r5_each_completed_warmup_is_recorded_before_the_batch_ends(incumbent: Prompt, repo: Path) -> None:
+    cfg, its = CONFIGS["inc"], items(3)
+    run_dir = repo / "runs" / "r"
+
+    async def last_warmup_dies(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if body["text"] == WARMUP_TEXT and body["cache_key"] == "k15":
+            for _ in range(1_000):  # give the other 15 warm-ups time to finish
+                if len(read_meta(run_dir).warmups) == 15:
+                    break
+                await asyncio.sleep(0)
+            raise Killed
+        return httpx.Response(200, json=ok_body())
+
+    with pytest.raises((Killed, ExceptionGroup)):
+        run_sync(cfg, incumbent, "dev", its, last_warmup_dies, repo, run_id="r")
+    assert sorted(w.cache_key or "" for w in read_meta(run_dir).warmups) == sorted(f"k{i}" for i in range(15))
+
+    meta = run_sync(cfg, incumbent, "dev", its, ok_handler(), repo, run_id="r")
+    assert meta.complete and len(meta.warmups) == 15 + 16  # a resume with items left warms again (spec §4)

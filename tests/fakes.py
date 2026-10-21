@@ -155,6 +155,11 @@ def timeout_usage(text: str) -> Usage:
     return Usage(uncached_input=2_000, output=200)
 
 
+def reservation(text: str) -> float:
+    """Worst case of one attempt: with one price for every class, the timeout charge."""
+    return cost(timeout_usage(text))
+
+
 def git(repo: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(repo), "-c", "user.name=test", "-c", "user.email=test@example.invalid", *args],
@@ -223,6 +228,7 @@ def run_sync(
     limiter: RateLimiter | None = None,
     concurrency: int = 16,
     tokens: int = 100,
+    reservation_fn: Callable[[str], float] = reservation,
 ) -> RunMeta:
     """`runner.run` against a fake transport, with `runs/` under `repo`."""
 
@@ -240,6 +246,7 @@ def run_sync(
                 repo_root=repo,
                 cost_fn=cost,
                 timeout_usage_fn=timeout_usage,
+                reservation_fn=reservation_fn,
                 token_estimate_fn=lambda text: tokens,
                 budget=budget,
                 run_id=run_id,
@@ -258,6 +265,7 @@ def retry_sync(
     repo: Path,
     *,
     budget: RunBudget = UNLIMITED,
+    concurrency: int = 16,
 ) -> RunMeta:
     async def go() -> RunMeta:
         sender = make_sender(handler, FakeClock())
@@ -271,8 +279,10 @@ def retry_sync(
                 repo_root=repo,
                 cost_fn=cost,
                 timeout_usage_fn=timeout_usage,
+                reservation_fn=reservation,
                 token_estimate_fn=lambda text: 100,
                 budget=budget,
+                concurrency=concurrency,
             )
 
     return asyncio.run(go())

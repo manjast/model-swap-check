@@ -11,9 +11,9 @@ import httpx
 import pytest
 from fakes import FAKE_URL, FakeClock, UpperRandom, make_sender, ok_body, timeout_usage
 
-from swapcheck.http import Sender, SendResult
+from swapcheck.http import AttemptBudget, Sender, SendResult
 from swapcheck.providers.base import HttpRequest
-from swapcheck.records import Parsed, Usage
+from swapcheck.records import Attempt, Parsed, Usage
 
 CFG_USAGE = Usage(uncached_input=100, cache_read=1000, output=10)
 
@@ -34,7 +34,7 @@ def scripted(responses: list[Any], clock: FakeClock, latency_s: float = 0.0) -> 
     return make_sender(handler, clock, rng), rng
 
 
-def send(sender: Sender) -> SendResult:
+def send(sender: Sender, budget: AttemptBudget | None = None) -> SendResult:
     def parse(body: Any) -> Parsed:
         return Parsed(
             status="ok",
@@ -48,7 +48,9 @@ def send(sender: Sender) -> SendResult:
     async def go() -> SendResult:
         async with sender.client:
             request = HttpRequest("POST", FAKE_URL, {}, {"text": "hi"})
-            return await sender.send(request, tokens=10, parse=parse, timeout_usage=lambda: timeout_usage("hi"))
+            return await sender.send(
+                request, tokens=10, parse=parse, timeout_usage=lambda: timeout_usage("hi"), budget=budget
+            )
 
     return asyncio.run(go())
 
@@ -169,3 +171,37 @@ def test_r3_timeouts_exhaust_into_timeout_error() -> None:
     assert result.error_code == "timeout"
     assert all(a.usage_estimated and a.usage == timeout_usage("hi") for a in result.attempts)
     assert len(result.attempts) == 6
+
+
+class Allowance:
+    """Admits `allowed` attempts, logging every admission and charge in order."""
+
+    def __init__(self, allowed: int) -> None:
+        self.allowed = allowed
+        self.log: list[str] = []
+
+    async def admit(self) -> bool:
+        admitted = self.allowed > 0
+        self.allowed -= 1
+        self.log.append("admit" if admitted else "refuse")
+        return admitted
+
+    def charge(self, attempt: Attempt) -> None:
+        self.log.append(f"charge {attempt.number} {attempt.error}")
+
+
+def test_r3_every_attempt_is_admitted_before_it_starts_and_charged_when_it_ends() -> None:
+    clock = FakeClock()
+    sender, _ = scripted([httpx.ReadTimeout("slow") for _ in range(6)], clock)
+    allowance = Allowance(2)
+    result = send(sender, allowance)
+    assert result.error_code == "budget" and result.parsed is None
+    assert [a.error for a in result.attempts] == ["timeout", "timeout"]
+    assert allowance.log == ["admit", "charge 1 timeout", "admit", "charge 2 timeout", "refuse"]
+
+
+def test_r3_a_successful_attempt_is_charged_once() -> None:
+    allowance = Allowance(6)
+    sender, _ = scripted([httpx.Response(503), ok()], FakeClock())
+    assert send(sender, allowance).parsed is not None
+    assert allowance.log == ["admit", "charge 1 http_503", "admit", "charge 2 None"]

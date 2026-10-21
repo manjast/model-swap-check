@@ -4,7 +4,10 @@ tag, and the decisions not run. Written by the runner, never by hand; `verify_ma
 
 from __future__ import annotations
 
+import fcntl
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -16,6 +19,7 @@ from swapcheck.freeze import GUARDED_SPLITS
 from swapcheck.records import RUN_JSON, Split, read_meta
 
 MANIFEST = "manifest.yaml"
+MANIFEST_LOCK = "manifest.yaml.lock"
 NotRunReason = Literal["no dev gain", "budget"]
 
 
@@ -73,34 +77,49 @@ def save_manifest(runs_dir: Path, manifest: Manifest) -> None:
     os.replace(tmp, path)
 
 
+@contextmanager
+def manifest_lock(runs_dir: Path) -> Iterator[None]:
+    """Exclusive interprocess lock (`flock` on `runs/manifest.yaml.lock`) for one load-check-save of the
+    manifest, so two processes cannot both admit a run or overwrite each other's entries."""
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    with (runs_dir / MANIFEST_LOCK).open("a") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 def append_run(runs_dir: Path, entry: ManifestRun) -> None:
     """Record a run at its start. A second run ID for the same tag, configuration and split is refused;
     recording the same run again (a restart before its first row) changes nothing."""
-    manifest = load_manifest(runs_dir)
-    existing = manifest.run_for(entry.contract_tag, entry.config_id, entry.split)
-    if existing is not None:
-        if existing.run_id != entry.run_id:
-            raise ManifestError(
-                f"{entry.config_id} on {entry.split} already has run {existing.run_id} under {entry.contract_tag}; "
-                "only resume and retry-errors are allowed (spec §9.5)"
-            )
-        if existing != entry:
-            raise ManifestError(f"run {entry.run_id} is already in the manifest with different hashes")
-        return
-    manifest.runs.append(entry)
-    save_manifest(runs_dir, manifest)
+    with manifest_lock(runs_dir):
+        manifest = load_manifest(runs_dir)
+        existing = manifest.run_for(entry.contract_tag, entry.config_id, entry.split)
+        if existing is not None:
+            if existing.run_id != entry.run_id:
+                raise ManifestError(
+                    f"{entry.config_id} on {entry.split} already has run {existing.run_id} under "
+                    f"{entry.contract_tag}; only resume and retry-errors are allowed (spec §9.5)"
+                )
+            if existing != entry:
+                raise ManifestError(f"run {entry.run_id} is already in the manifest with different hashes")
+            return
+        manifest.runs.append(entry)
+        save_manifest(runs_dir, manifest)
 
 
 def add_not_run(runs_dir: Path, decision_id: str, reason: NotRunReason, *, contract_tag: str) -> None:
     """List a decision as NOT RUN (spec §7.2) with its reason."""
-    manifest = load_manifest(runs_dir)
-    for entry in manifest.not_run:
-        if (entry.contract_tag, entry.decision_id) == (contract_tag, decision_id):
-            if entry.reason != reason:
-                raise ManifestError(f"{decision_id} is already NOT RUN under {contract_tag} for {entry.reason!r}")
-            return
-    manifest.not_run.append(NotRun(contract_tag=contract_tag, decision_id=decision_id, reason=reason))
-    save_manifest(runs_dir, manifest)
+    with manifest_lock(runs_dir):
+        manifest = load_manifest(runs_dir)
+        for entry in manifest.not_run:
+            if (entry.contract_tag, entry.decision_id) == (contract_tag, decision_id):
+                if entry.reason != reason:
+                    raise ManifestError(f"{decision_id} is already NOT RUN under {contract_tag} for {entry.reason!r}")
+                return
+        manifest.not_run.append(NotRun(contract_tag=contract_tag, decision_id=decision_id, reason=reason))
+        save_manifest(runs_dir, manifest)
 
 
 def verify_manifest(
@@ -110,7 +129,7 @@ def verify_manifest(
 
     Checks each entry under the tag against the contract and against its own `run.json`, requires the
     contract tag commit (equal to `tag_commit` when given), and requires every `cert`/`aa` run directory
-    to be listed.
+    to be listed under its own name and to carry that name as its `run.json` run ID.
     """
     problems: list[str] = []
     for entry in manifest.runs:
@@ -139,6 +158,7 @@ def verify_manifest(
             continue
         meta = read_meta(run_json.parent)
         recorded = {
+            "run_id": meta.run_id,
             "config_id": meta.config_id,
             "split": meta.split,
             "config_sha256": meta.config_sha256,
@@ -153,7 +173,13 @@ def verify_manifest(
 
     listed = {entry.run_id for entry in manifest.runs}
     for run_json in sorted(runs_dir.glob(f"*/{RUN_JSON}")):
+        name = run_json.parent.name
         meta = read_meta(run_json.parent)
-        if meta.split in GUARDED_SPLITS and meta.run_id not in listed:
-            problems.append(f"{meta.run_id} ({meta.config_id}, {meta.split}): run directory is not in the manifest")
+        if meta.split not in GUARDED_SPLITS:
+            continue
+        where = f"{name} ({meta.config_id}, {meta.split})"
+        if meta.run_id != name:
+            problems.append(f"{where}: run.json run_id {meta.run_id} differs from the directory name")
+        if name not in listed:
+            problems.append(f"{where}: run directory is not in the manifest")
     return problems

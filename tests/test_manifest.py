@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import shutil
 from pathlib import Path
@@ -10,10 +11,12 @@ import httpx
 import pytest
 from fakes import clone_repo, git, items, make_repo, ok_body, ok_handler, run_sync
 
+from swapcheck import manifest as manifest_mod
 from swapcheck.configs import load_configurations
 from swapcheck.contract import Contract, ContractConfiguration
 from swapcheck.manifest import (
     MANIFEST,
+    MANIFEST_LOCK,
     Manifest,
     ManifestError,
     ManifestRun,
@@ -144,6 +147,73 @@ def test_r10_cert_run_directory_missing_from_manifest_is_refused(certified: tupl
     (runs_dir / "luna-cert-again" / RUN_JSON).write_text(json.dumps({**meta, "run_id": "luna-cert-again"}))
     problems = verify_manifest(load_manifest(runs_dir), contract, runs_dir)
     assert problems == ["luna-cert-again (luna-none, cert): run directory is not in the manifest"]  # dev run is fine
+
+
+def test_r10_copied_cert_run_directory_with_unedited_run_json_is_refused(
+    certified: tuple[Path, Contract, str],
+) -> None:
+    runs_dir, contract, _ = certified
+    shutil.copytree(runs_dir / "luna-cert", runs_dir / "luna-cert-copy")  # run.json still says luna-cert
+    problems = verify_manifest(load_manifest(runs_dir), contract, runs_dir)
+    assert problems == [
+        "luna-cert-copy (luna-none, cert): run.json run_id luna-cert differs from the directory name",
+        "luna-cert-copy (luna-none, cert): run directory is not in the manifest",
+    ]
+
+
+def test_r10_listed_directory_holding_another_run_id_is_refused(certified: tuple[Path, Contract, str]) -> None:
+    runs_dir, contract, _ = certified
+    meta_path = runs_dir / "inc-aa" / RUN_JSON
+    meta_path.write_text(read_meta(meta_path.parent).model_copy(update={"run_id": "inc-aa-other"}).model_dump_json())
+    problems = verify_manifest(load_manifest(runs_dir), contract, runs_dir)
+    assert "inc-aa (inc, aa): run.json run_id differs from the manifest" in problems
+    assert "inc-aa (inc, aa): run.json run_id inc-aa-other differs from the directory name" in problems
+
+
+def test_r10_manifest_changes_hold_the_interprocess_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every load and save inside `append_run` and `add_not_run` happens while another open file
+    description of the lock file cannot take it, as a second process could not."""
+    held: list[bool] = []
+
+    def probe() -> None:
+        with (tmp_path / MANIFEST_LOCK).open("a") as other:
+            try:
+                fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                held.append(True)
+            else:
+                fcntl.flock(other.fileno(), fcntl.LOCK_UN)
+                held.append(False)
+
+    real_load, real_save = manifest_mod.load_manifest, manifest_mod.save_manifest
+
+    def load(runs_dir: Path) -> Manifest:
+        probe()
+        return real_load(runs_dir)
+
+    def save(runs_dir: Path, manifest: Manifest) -> None:
+        probe()
+        real_save(runs_dir, manifest)
+
+    monkeypatch.setattr(manifest_mod, "load_manifest", load)
+    monkeypatch.setattr(manifest_mod, "save_manifest", save)
+    entry = ManifestRun(
+        contract_tag="contract-v1",
+        contract_tag_commit="a" * 40,
+        config_id="inc",
+        split="cert",
+        run_id="one",
+        config_sha256="c",
+        prompt_sha256="p",
+        schema_sha256="s",
+        item_list_sha256="i",
+    )
+    append_run(tmp_path, entry)
+    add_not_run(tmp_path, "D-A2", "no dev gain", contract_tag="contract-v1")
+    assert held == [True] * 4  # load and save of each change
+    probe()
+    assert held[-1] is False  # released afterwards
+    assert [r.run_id for r in real_load(tmp_path).runs] == ["one"]
 
 
 def test_r10_manifest_entry_without_run_directory_is_refused(certified: tuple[Path, Contract, str]) -> None:

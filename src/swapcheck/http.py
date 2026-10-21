@@ -72,11 +72,13 @@ class RetryPolicy:
 class SendResult:
     attempts: list[Attempt]
     parsed: Parsed | None  # set when the final attempt was a 2xx with a JSON body
-    error_code: str | None  # None on success; else `http_<status>`, `timeout`, `connection`, `quota`, `bad_body`
+    error_code: str | None  # None on success; else `http_<status>`, `timeout`, `connection`, `quota`, `bad_body`,
+    # or `budget` (an attempt the spend budget refused)
     error_body: str | None  # body of a final error response, capped at 2,000 chars
 
     @property
     def final(self) -> Attempt:
+        """The last attempt; a result has none only when the budget refused its first attempt."""
         return self.attempts[-1]
 
 
@@ -117,6 +119,18 @@ def is_quota_error(body: Any) -> bool:
     return isinstance(details, Mapping) and details.get("error_code") in QUOTA_ERROR_CODES
 
 
+class AttemptBudget(Protocol):
+    """Spend admission per HTTP attempt (spec §9.5), retries included."""
+
+    async def admit(self) -> bool:
+        """Reserve the worst-case cost of one more attempt; False means it must not start."""
+        ...
+
+    def charge(self, attempt: Attempt) -> None:
+        """Release that reservation and charge the completed attempt."""
+        ...
+
+
 @dataclass
 class Sender:
     """Sends requests for one provider: auth, rate limit per attempt, timeouts and retries."""
@@ -142,12 +156,23 @@ class Sender:
         tokens: int,
         parse: Callable[[Mapping[str, Any]], Parsed],
         timeout_usage: Callable[[], Usage],
+        budget: AttemptBudget | None = None,
     ) -> SendResult:
         """Send with retries. `tokens` is the rate-limit estimate charged per attempt; `timeout_usage`
-        is the charge recorded for a timed-out attempt (spec §9.5)."""
+        is the charge recorded for a timed-out attempt (spec §9.5). With a `budget`, every attempt must
+        be admitted before it starts and is charged when it ends; a refused attempt ends the request
+        with error code `budget`."""
         attempts: list[Attempt] = []
+
+        def record(attempt: Attempt) -> None:
+            attempts.append(attempt)
+            if budget is not None:
+                budget.charge(attempt)
+
         headers = {**request.headers, **self.adapter.auth_headers(self.api_key)}
         for number in range(1, self.policy.max_attempts + 1):
+            if budget is not None and not await budget.admit():
+                return SendResult(attempts, None, "budget", None)
             if self.limiter is not None:
                 await self.limiter.acquire(tokens)
             http_request = self.client.build_request(
@@ -159,7 +184,7 @@ class Sender:
                     response = await self.client.send(http_request)
             except (TimeoutError, httpx.TimeoutException):
                 latency = (self.clock.monotonic() - start) * 1000.0
-                attempts.append(
+                record(
                     Attempt(
                         number=number,
                         http_status=None,
@@ -175,7 +200,7 @@ class Sender:
                 return SendResult(attempts, None, "timeout", None)
             except httpx.TransportError:
                 latency = (self.clock.monotonic() - start) * 1000.0
-                attempts.append(Attempt(number=number, http_status=None, error="connection", latency_ms=latency))
+                record(Attempt(number=number, http_status=None, error="connection", latency_ms=latency))
                 if number < self.policy.max_attempts:
                     await self.clock.sleep(self.backoff_s(number, None))
                     continue
@@ -192,7 +217,7 @@ class Sender:
 
             if 200 <= status < 300:
                 if not isinstance(body, Mapping):
-                    attempts.append(
+                    record(
                         Attempt(
                             number=number,
                             http_status=status,
@@ -203,7 +228,7 @@ class Sender:
                     )
                     return SendResult(attempts, None, "bad_body", response.text[:ERROR_BODY_CHARS])
                 parsed = parse(body)
-                attempts.append(
+                record(
                     Attempt(
                         number=number,
                         http_status=status,
@@ -217,7 +242,7 @@ class Sender:
             wait = retry_after_s(response.headers, self.clock.now())
             quota = status == 429 and is_quota_error(body)
             error = "quota" if quota else f"http_{status}"
-            attempts.append(
+            record(
                 Attempt(
                     number=number,
                     http_status=status,

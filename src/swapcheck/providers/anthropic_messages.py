@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,6 +18,11 @@ URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"  # recorded per run (RunMeta.versions)
 STOP_CODES = {"refusal": "refusal", "max_tokens": "truncated"}
 RATE_LIMIT_NAMES = frozenset({"retry-after"})
+# Pre-output refusal categories Anthropic documents as not billed; `None` is a refusal without a named
+# category. A pre-output refusal in any other category (`bio`, `frontier_llm`, `reasoning_extraction`, or
+# one added later) and every mid-output refusal is billed. Source:
+# https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#how-refusals-are-billed
+UNBILLED_REFUSAL_CATEGORIES: frozenset[str | None] = frozenset({"cyber", "general_harms", None})
 
 
 class AnthropicMessagesAdapter:
@@ -50,11 +56,22 @@ class AnthropicMessagesAdapter:
         return HttpRequest("POST", URL, headers, body)
 
     def parse_response(self, cfg: Configuration, prompt: Prompt, body: Mapping[str, Any]) -> Parsed:
-        usage = _usage(body.get("usage") or {})
+        raw_usage: Mapping[str, Any] = body.get("usage") or {}
+        usage = _usage(raw_usage)
         model_id = body.get("model")
         stop_reason = body.get("stop_reason")
         blocks: list[Mapping[str, Any]] = body.get("content") or []
         text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+        if stop_reason == "refusal" and _unbilled_refusal(body, blocks, usage):
+            # Not billed: zero billable usage; the reported counts are kept for diagnostics in `raw_output`.
+            diagnostics = {"billed": False, "stop_details": body.get("stop_details"), "usage": raw_usage}
+            return llm_invalid(
+                "refusal",
+                json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":")),
+                stop_reason=stop_reason,
+                model_id=model_id,
+                usage=Usage(),
+            )
         code = STOP_CODES.get(stop_reason or "")
         if code is not None:
             return llm_invalid(code, text, stop_reason=stop_reason, model_id=model_id, usage=usage)
@@ -75,3 +92,12 @@ def _usage(raw: Mapping[str, Any]) -> Usage:
         output=raw.get("output_tokens") or 0,
         reasoning=(raw.get("output_tokens_details") or {}).get("thinking_tokens"),
     )
+
+
+def _unbilled_refusal(body: Mapping[str, Any], blocks: list[Mapping[str, Any]], usage: Usage) -> bool:
+    """A refusal before any output (no content, no output tokens) in a documented unbilled category.
+    Without `stop_details` the category is unknown, so the refusal is treated as billed."""
+    details = body.get("stop_details")
+    if blocks or usage.output or not isinstance(details, Mapping) or "category" not in details:
+        return False
+    return details["category"] in UNBILLED_REFUSAL_CATEGORIES

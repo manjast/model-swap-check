@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import json
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from swapcheck.records import (
     Usage,
     Warmup,
 )
+from swapcheck.schema import jev_design
 
 CONFIGS = load_configurations()
 PRICES = cost.load_prices()
@@ -143,12 +145,58 @@ def test_k1_typesafe_input_only() -> None:
     assert m.reasoning_mean is None and m.reasoning_p95 is None
 
 
+TIMEOUT_TEXT = "I still have not received my new card, what should I do?"
+FIXTURES = Path(__file__).parent / "fixtures" / "responses"
+
+
+def _o200k(text: str) -> int:
+    return len(tiktoken.get_encoding("o200k_base").encode(text))
+
+
+def _estimate(prompt: Prompt, config_id: str, text: str = TIMEOUT_TEXT) -> int:
+    return cost.input_token_estimate(CONFIGS[config_id], prompt, text)
+
+
 @pytest.mark.parametrize(("config_id", "max_output"), [("luna-none", 200), ("haiku55-medium", 4096), ("jev-noul", 0)])
 def test_k1_timeout_charged_as_full_input_plus_max_output(incumbent: Prompt, config_id: str, max_output: int) -> None:
-    text = "I still have not received my new card, what should I do?"
-    expected_input = prefix_tokens(incumbent) + len(tiktoken.get_encoding("o200k_base").encode(text))
-    usage = cost.timeout_usage(CONFIGS[config_id], incumbent, text)
-    assert usage == Usage(uncached_input=expected_input, output=max_output)
+    usage = cost.timeout_usage(CONFIGS[config_id], incumbent, TIMEOUT_TEXT)
+    assert (usage.output, usage.cache_read, usage.cache_write) == (max_output, 0, 0)  # all input uncached
+    assert usage.uncached_input == _estimate(incumbent, config_id)
+    # never below the developer message (for Jev: the criteria translated from it) plus the customer text
+    assert usage.uncached_input >= prefix_tokens(incumbent) + _o200k(TIMEOUT_TEXT)
+
+
+def test_k1_input_estimate_counts_both_jev_questions(incumbent: Prompt) -> None:
+    noul = _estimate(incumbent, "jev-noul")
+    assert noul > _estimate(incumbent, "jev-c51")  # the Noul question adds a second catalog and instructions
+    design = jev_design(CONFIGS["jev-noul"], incumbent)
+    assert noul >= _o200k(json.dumps(design["choice"])) + _o200k(json.dumps(design["noul"]))
+
+
+def test_k1_input_estimate_anthropic_not_below_openai(incumbent: Prompt) -> None:
+    # same system/developer text, text and schema; Claude's tokenizer and injected structured-output prompt
+    assert _estimate(incumbent, "haiku55-off") >= _estimate(incumbent, "luna-none")
+    assert _estimate(incumbent, "haiku55-medium") >= _estimate(incumbent, "luna-medium")
+
+
+@pytest.mark.parametrize("config_id", ["inc", "luna-none", "haiku55-off", "jev-c51"])
+def test_k1_input_estimate_grows_with_the_text(incumbent: Prompt, config_id: str) -> None:
+    long_text = TIMEOUT_TEXT + " It was meant to arrive last week and the app still says dispatched." * 20
+    grown = _estimate(incumbent, config_id, long_text) - _estimate(incumbent, config_id)
+    assert grown >= _o200k(long_text) - _o200k(TIMEOUT_TEXT)
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in FIXTURES.glob("doc-*.json")))
+def test_k1_input_estimate_covers_reported_input_of_doc_fixtures(incumbent: Prompt, name: str) -> None:
+    """The fixtures answer short customer messages like TIMEOUT_TEXT; their reported input (uncached,
+    cache read and cache write; OpenAI's `input_tokens` already includes cached tokens) must not exceed
+    the estimate, or a timeout and the spend reservation would be under-charged."""
+    doc = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+    reported = doc["body"]["usage"]
+    keys = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    total = sum(reported.get(k) or 0 for k in keys)
+    assert total > 0
+    assert _estimate(incumbent, doc["config_id"]) >= total
 
 
 def test_k1_every_configuration_is_priced() -> None:

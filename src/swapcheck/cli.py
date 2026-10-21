@@ -65,6 +65,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     from swapcheck import budget as budget_mod
     from swapcheck import cost, runner
     from swapcheck.configs import load_configurations
+    from swapcheck.freeze import GUARDED_SPLITS, tag_commit
     from swapcheck.http import Sender, SystemClock
     from swapcheck.providers import get_adapter
     from swapcheck.ratelimit import RateLimiter, TokenEstimator, limit_for, load_limits
@@ -75,6 +76,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     cfg = configs[args.config]
     if cfg.pilot_only and args.split != "pilot":
         raise SystemExit(f"{cfg.id} is a pilot-only variant")
+    runs_dir = REPO_ROOT / "runs"
+    if args.split in GUARDED_SPLITS and not args.retry_errors:
+        commit = tag_commit(REPO_ROOT)
+        if commit is not None and cfg.provider in budget_mod.stopped_providers(runs_dir, configs, commit):
+            raise SystemExit(
+                f"{cfg.provider} had an in-run budget stop under this contract tag; no later run starts (spec §9.5)"
+            )
     run_prompt = prompt.load_prompt(cfg.prompt_path)
     items = data.load_splits(load_groups())[args.split]
     adapter = get_adapter(cfg.provider)
@@ -82,13 +90,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not api_key:
         raise SystemExit(f"{adapter.api_key_env} is not set (put it in .env)")
     prices = cost.load_prices()
-    runs_dir = REPO_ROOT / "runs"
     spent = cost.spent_usd(runs_dir, prices, configs).get(cfg.provider, 0.0)
     limit = budget_mod.load_budget().limit(cfg.provider)
     if args.split == "dev" and args.ceiling_usd is None:
         raise SystemExit("dev runs need --ceiling-usd from the pre-dev budget gate (spec §9.5)")
     ceiling = min(limit, args.ceiling_usd) if args.ceiling_usd is not None else limit
-    reason = "budget cap" if ceiling == limit else "spend ceiling"
+    reason = budget_mod.BUDGET_STOP if ceiling == limit else "spend ceiling"
     print(f"{cfg.id} on {args.split} ({len(items)} items): {cfg.provider} spent ${spent:.4f}, ceiling ${ceiling:.2f}")
 
     async def go() -> int:
@@ -104,6 +111,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             def timeout_fn(text: str) -> Usage:
                 return cost.timeout_usage(cfg, run_prompt, text)
 
+            def reservation_fn(text: str) -> float:
+                return cost.reservation_usd(prices, cfg, timeout_fn(text))
+
             if args.retry_errors:
                 meta = await runner.retry_errors(
                     runs_dir / args.retry_errors,
@@ -114,6 +124,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     repo_root=REPO_ROOT,
                     cost_fn=cost_fn,
                     timeout_usage_fn=timeout_fn,
+                    reservation_fn=reservation_fn,
                     token_estimate_fn=estimate,
                     budget=budget,
                 )
@@ -128,6 +139,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     repo_root=REPO_ROOT,
                     cost_fn=cost_fn,
                     timeout_usage_fn=timeout_fn,
+                    reservation_fn=reservation_fn,
                     token_estimate_fn=estimate,
                     budget=budget,
                     run_id=args.run_id,

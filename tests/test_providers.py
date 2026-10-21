@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from swapcheck.configs import Configuration, load_configurations
+from swapcheck.cost import attempt_cost_usd, load_prices
 from swapcheck.groups import OUT_OF_SCOPE
 from swapcheck.parse import RAW_OUTPUT_CAP
 from swapcheck.prompt import Prompt
@@ -18,6 +19,7 @@ from swapcheck.schema import llm_output_schema
 
 FIXTURES = Path(__file__).parent / "fixtures" / "responses"
 CONFIGS = load_configurations()
+PRICES = load_prices()
 # luna-none-x's prompt is written at M4; every other configuration is snapshot here.
 SNAPSHOT_IDS = sorted(cid for cid in CONFIGS if cid != "luna-none-x")
 RAW_TEXT = "  Where's my new card?? It's been 2 weeks…\n\tI'm in Zürich 💳  "
@@ -328,11 +330,55 @@ def test_r2_anthropic_thinking_cache_read_and_case_normalization(incumbent: Prom
     assert parsed.usage == Usage(uncached_input=16, cache_read=2741, cache_write=0, output=171, reasoning=152)
 
 
-def test_p2_r2_anthropic_refusal(incumbent: Prompt) -> None:
+def test_p2_r2_anthropic_unbilled_refusal_bills_zero_and_keeps_reported_counts(incumbent: Prompt) -> None:
+    cfg, _, _ = _fixture("doc-anthropic-refusal.json")  # pre-output, category `cyber`: not billed
     parsed, request_id, _ = _parse("doc-anthropic-refusal.json", incumbent)
     assert (parsed.status, parsed.error_code, parsed.stop_reason) == ("invalid_output", "refusal", "refusal")
-    assert parsed.usage == Usage(uncached_input=2757, reasoning=None)  # thinking_tokens unreported
+    assert parsed.usage == Usage()
+    assert attempt_cost_usd(PRICES, cfg, parsed.usage) == 0.0
+    diagnostics = json.loads(parsed.raw_output)
+    assert diagnostics["billed"] is False
+    assert diagnostics["stop_details"]["category"] == "cyber"
+    assert diagnostics["usage"]["input_tokens"] == 2757  # reported, kept for diagnostics
+    assert len(parsed.raw_output) <= RAW_OUTPUT_CAP
     assert request_id == "req_01XFUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.parametrize("category", ["general_harms", None])
+def test_p2_anthropic_other_unbilled_refusal_categories(incumbent: Prompt, category: str | None) -> None:
+    cfg, _, body = _fixture("doc-anthropic-refusal.json")
+    body = {**body, "stop_details": {"type": "refusal", "category": category, "explanation": None}}
+    parsed = get_adapter("anthropic").parse_response(cfg, incumbent, body)
+    assert (parsed.status, parsed.error_code, parsed.usage) == ("invalid_output", "refusal", Usage())
+    assert json.loads(parsed.raw_output)["stop_details"]["category"] == category
+
+
+def test_p2_r2_anthropic_billed_refusal_category_is_charged(incumbent: Prompt) -> None:
+    cfg, _, body = _fixture("doc-anthropic-refusal-bio.json")  # pre-output, category `bio`: billed
+    parsed, request_id, _ = _parse("doc-anthropic-refusal-bio.json", incumbent)
+    assert (parsed.status, parsed.error_code, parsed.stop_reason) == ("invalid_output", "refusal", "refusal")
+    assert parsed.usage == Usage(uncached_input=19, cache_read=2741)
+    assert attempt_cost_usd(PRICES, cfg, parsed.usage) > 0
+    assert parsed.raw_output == ""  # no model text
+    assert request_id == "req_01Hb7RkQpLm2VnTzW4sYcXbD"
+    for category in ("frontier_llm", "reasoning_extraction", "some_future_category"):
+        changed = {**body, "stop_details": {**body["stop_details"], "category": category}}
+        assert get_adapter("anthropic").parse_response(cfg, incumbent, changed).usage == parsed.usage, category
+
+
+def test_p2_anthropic_mid_output_or_uncategorized_refusal_is_charged(incumbent: Prompt) -> None:
+    cfg, _, body = _fixture("doc-anthropic-refusal.json")
+    mid_output = {
+        **body,
+        "content": [{"type": "text", "text": '{"intent": "card_'}],
+        "usage": {**body["usage"], "output_tokens": 7},
+    }
+    parsed = get_adapter("anthropic").parse_response(cfg, incumbent, mid_output)
+    assert (parsed.status, parsed.error_code) == ("invalid_output", "refusal")
+    assert parsed.usage == Usage(uncached_input=2757, output=7)
+    assert parsed.raw_output == '{"intent": "card_'
+    no_details = {k: v for k, v in body.items() if k != "stop_details"}  # category unknown: charge
+    assert get_adapter("anthropic").parse_response(cfg, incumbent, no_details).usage == Usage(uncached_input=2757)
 
 
 def test_p2_r2_anthropic_truncation(incumbent: Prompt) -> None:

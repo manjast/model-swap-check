@@ -8,9 +8,12 @@ uses an interpolated value below what was measured.
 from __future__ import annotations
 
 import functools
+import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import yaml
@@ -18,8 +21,12 @@ from pydantic import BaseModel, ConfigDict
 
 from swapcheck.configs import Configuration
 from swapcheck.groups import REPO_ROOT
-from swapcheck.prompt import Prompt, prefix_tokens
+from swapcheck.prompt import Prompt
+from swapcheck.providers import get_adapter
 from swapcheck.records import RUN_JSON, Attempt, ItemRow, Usage, Warmup, read_meta, read_rows
+
+if TYPE_CHECKING:
+    import tiktoken
 
 PRICES_PATH = REPO_ROOT / "config" / "prices.yaml"
 PROVIDERS = ("openai", "anthropic", "typesafe")
@@ -74,25 +81,52 @@ def attempt_cost_usd(prices: Prices, cfg: Configuration, usage: Usage) -> float:
     return _usage_cost(price, usage.uncached_input, usage.cache_read, usage.cache_write, usage.output)
 
 
-@functools.cache
-def _prefix_tokens(prompt: Prompt) -> int:
-    return prefix_tokens(prompt)
+def reservation_usd(prices: Prices, cfg: Configuration, usage: Usage) -> float:
+    """Worst-case cost of one attempt, held by the spend guard while it is in flight (spec §9.5).
+
+    `usage` is the timeout charge (`timeout_usage`): its full input estimate is priced at the dearest
+    input rate, since a cache-missing request that writes its prefix pays the cache-write rate where that
+    exceeds the uncached one, plus its output allowance at the output rate.
+    """
+    price = prices.for_model(cfg.model)
+    input_tokens = usage.uncached_input + usage.cache_read + usage.cache_write
+    input_rate = max(price.uncached_input, price.cache_read, price.cache_write)
+    return _PER_TOKEN * (input_tokens * input_rate + usage.output * price.output)
+
+
+# `o200k_base` tokens of the serialized request body over-count OpenAI's billed input (JSON syntax, field
+# names and the model ID are not billed as text), so OpenAI uses the count as is. Anthropic and TypeSafe
+# tokenize differently, and Anthropic also bills a structured-output system prompt it injects (size open
+# until the pilot, spec §14), so their count is scaled up. Over-estimating only makes the timeout charge
+# and the spend reservation more conservative.
+INPUT_SAFETY_FACTOR: dict[str, float] = {"openai": 1.0, "anthropic": 1.35, "typesafe": 1.35}
 
 
 @functools.cache
-def _o200k_len(text: str) -> int:
+def _o200k() -> tiktoken.Encoding:
     import tiktoken
 
-    return len(tiktoken.get_encoding("o200k_base").encode(text))
+    return tiktoken.get_encoding("o200k_base")
+
+
+def input_token_estimate(cfg: Configuration, prompt: Prompt, text: str) -> int:
+    """Conservative full input of one request for `text`, in the provider's billed tokens.
+
+    Counted on the body the adapter actually sends (developer/system message, user text, JSON schema;
+    for Jev the state and every question, including the Noul object), serialized as JSON, in
+    `o200k_base` tokens, times `INPUT_SAFETY_FACTOR[cfg.provider]`, rounded up.
+    """
+    body = get_adapter(cfg.provider).build_request(cfg, prompt, text, None).body
+    n = len(_o200k().encode(json.dumps(body, ensure_ascii=False)))
+    return math.ceil(n * INPUT_SAFETY_FACTOR[cfg.provider])
 
 
 def timeout_usage(cfg: Configuration, prompt: Prompt, text: str) -> Usage:
     """The charge for a timed-out attempt (spec §9.5): full uncached input plus max output tokens.
 
-    Input is estimated with `o200k_base` as the developer message plus the customer text. For Jev the
-    developer message stands in for the criteria it is translated from (§4.1), and only input is charged.
+    Input is `input_token_estimate`. Jev output is priced at $0 (§10), so only input is charged.
     """
-    uncached = _prefix_tokens(prompt) + _o200k_len(text)
+    uncached = input_token_estimate(cfg, prompt, text)
     if not cfg.is_llm:
         return Usage(uncached_input=uncached, output=0)
     if cfg.max_output_tokens is None:

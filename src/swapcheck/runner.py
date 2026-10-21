@@ -3,7 +3,8 @@ append-only item rows with resume, the in-run budget stop, finalization, the ret
 run validity.
 
 Pricing stays outside: callers pass `cost_fn` (usage → USD), `timeout_usage_fn` (item text → the
-charge for a timed-out attempt) and `token_estimate_fn` (item text → rate-limit tokens).
+charge for a timed-out attempt), `reservation_fn` (item text → worst-case USD of one attempt, held by
+the spend guard while it is in flight) and `token_estimate_fn` (item text → rate-limit tokens).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import io
 import os
 import platform
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from swapcheck.providers.base import WARMUP_TEXT
 from swapcheck.records import (
     ITEMS_FINAL,
     ITEMS_PLAIN,
+    ITEMS_RETRY,
     RUN_JSON,
     Attempt,
     ItemRow,
@@ -41,6 +43,7 @@ from swapcheck.records import (
     Usage,
     Warmup,
     read_meta,
+    read_retry_journal,
     read_rows,
 )
 from swapcheck.schema import schema_sha256
@@ -52,6 +55,7 @@ MAX_API_ERROR_RATE = (5, 1000)  # 0.5 %, compared exactly in integers (spec §9.
 
 CostFn = Callable[[Usage], float]
 TimeoutUsageFn = Callable[[str], Usage]
+ReservationFn = Callable[[str], float]
 TokenEstimateFn = Callable[[str], int]
 
 
@@ -75,17 +79,76 @@ class RunBudget:
 
 @dataclass
 class _Ledger:
+    """This invocation's spend against the ceiling: every attempt is charged as it ends, and the worst case
+    of every attempt in flight is held until then (spec §9.5)."""
+
     budget: RunBudget
     cost_fn: CostFn
     spent: float = 0.0
-    reserved: float = 0.0  # worst-case single attempt of every request in flight
+    reserved: float = 0.0
+    holds: int = 0  # attempts in flight
+    refused: bool = False  # an attempt of a started request was refused: the run stopped for budget
+    _changed: asyncio.Event = field(default_factory=asyncio.Event)
 
-    def charge(self, attempts: Sequence[Attempt]) -> None:
-        self.spent += sum(self.cost_fn(a.usage) for a in attempts)
-
-    def fits(self, reserve: float) -> bool:
+    def fits(self, amount: float) -> bool:
         total = self.budget.spent_before_usd + self.spent + self.reserved
-        return total < self.budget.ceiling_usd and total + reserve <= self.budget.ceiling_usd
+        return total < self.budget.ceiling_usd and total + amount <= self.budget.ceiling_usd
+
+    def try_reserve(self, amount: float) -> bool:
+        if not self.fits(amount):
+            return False
+        self.reserved += amount
+        self.holds += 1
+        return True
+
+    async def reserve(self, amount: float) -> bool:
+        """Reserve `amount`, waiting while attempts in flight may still free room; False once none can."""
+        while not self.try_reserve(amount):
+            floor = self.budget.spent_before_usd + self.spent  # what remains once every hold has settled
+            if self.holds == 0 or floor >= self.budget.ceiling_usd or floor + amount > self.budget.ceiling_usd:
+                return False
+            changed = self._changed
+            await changed.wait()
+        return True
+
+    def settle(self, amount: float, attempt: Attempt | None) -> None:
+        """Release a hold of `amount`, charging the attempt it was held for when that attempt ran."""
+        self.reserved -= amount
+        self.holds -= 1
+        if attempt is not None:
+            self.spent += self.cost_fn(attempt.usage)
+        self._changed.set()
+        self._changed = asyncio.Event()
+
+
+@dataclass
+class _Gate:
+    """`AttemptBudget` for the attempts of one request; each attempt holds `amount` until it ends."""
+
+    ledger: _Ledger
+    amount: float
+    held: bool = False
+
+    def reserve_now(self) -> bool:
+        """Hold the first attempt's reservation without waiting (fan-out admission, in work order)."""
+        self.held = self.ledger.try_reserve(self.amount)
+        return self.held
+
+    async def admit(self) -> bool:
+        if not self.held:
+            self.held = await self.ledger.reserve(self.amount)
+            self.ledger.refused |= not self.held
+        return self.held
+
+    def charge(self, attempt: Attempt) -> None:
+        self.held = False
+        self.ledger.settle(self.amount, attempt)
+
+    def release(self) -> None:
+        """Drop a hold whose attempt never completed (an exception or cancellation)."""
+        if self.held:
+            self.held = False
+            self.ledger.settle(self.amount, None)
 
 
 @dataclass(frozen=True)
@@ -93,26 +156,31 @@ class _Requests:
     cfg: Configuration
     prompt: Prompt
     sender: Sender
-    cost_fn: CostFn
+    ledger: _Ledger
     timeout_usage_fn: TimeoutUsageFn
+    reservation_fn: ReservationFn
     token_estimate_fn: TokenEstimateFn
 
-    def reserve(self, text: str) -> float:
-        """Conservative charge held for an in-flight request: one timed-out attempt (full input + max output)."""
-        return self.cost_fn(self.timeout_usage_fn(text))
+    def gate(self, text: str) -> _Gate:
+        return _Gate(self.ledger, self.reservation_fn(text))
 
-    async def send(self, text: str, cache_key: str | None) -> SendResult:
+    async def send(self, text: str, cache_key: str | None, gate: _Gate) -> SendResult:
         adapter = self.sender.adapter
         request = adapter.build_request(self.cfg, self.prompt, text, cache_key)
-        return await self.sender.send(
-            request,
-            tokens=self.token_estimate_fn(text),
-            parse=lambda body: adapter.parse_response(self.cfg, self.prompt, body),
-            timeout_usage=lambda: self.timeout_usage_fn(text),
-        )
+        try:
+            return await self.sender.send(
+                request,
+                tokens=self.token_estimate_fn(text),
+                parse=lambda body: adapter.parse_response(self.cfg, self.prompt, body),
+                timeout_usage=lambda: self.timeout_usage_fn(text),
+                budget=gate,
+            )
+        finally:
+            gate.release()
 
-    async def item_row(self, item: Item, earlier: Sequence[Attempt] = ()) -> ItemRow:
-        result = await self.send(item.text, self.sender.adapter.cache_key(self.cfg, item.digest))
+    async def item_row(self, item: Item, gate: _Gate, earlier: Sequence[Attempt] = ()) -> ItemRow:
+        """`gate` already holds the first attempt, so the result has at least one attempt."""
+        result = await self.send(item.text, self.sender.adapter.cache_key(self.cfg, item.digest), gate)
         return _row(self.cfg, item.item_id, result, earlier)
 
 
@@ -261,34 +329,29 @@ class _RowWriter:
 async def _fan_out[T](
     work: Sequence[T],
     *,
-    reserve_of: Callable[[T], float],
-    process: Callable[[T], Awaitable[ItemRow]],
+    gate_of: Callable[[T], _Gate],
+    process: Callable[[T, _Gate], Awaitable[ItemRow]],
     on_row: Callable[[ItemRow], None],
-    ledger: _Ledger,
     concurrency: int,
 ) -> bool:
-    """Process `work` in order with at most `concurrency` in flight; before each start, stop if the
-    budget no longer fits. Returns True when stopped for budget."""
+    """Process `work` in order with at most `concurrency` in flight; before each start, stop if its first
+    attempt no longer fits the budget. Returns True when stopped for budget."""
     semaphore = asyncio.Semaphore(concurrency)
 
-    async def worker(unit: T, reserve: float) -> None:
+    async def worker(unit: T, gate: _Gate) -> None:
         try:
-            row = await process(unit)
-            ledger.charge(row.attempts)
-            on_row(row)
+            on_row(await process(unit, gate))
         finally:
-            ledger.reserved -= reserve
             semaphore.release()
 
     async with asyncio.TaskGroup() as group:
         for unit in work:
             await semaphore.acquire()
-            reserve = reserve_of(unit)
-            if not ledger.fits(reserve):
+            gate = gate_of(unit)
+            if not gate.reserve_now():
                 semaphore.release()
                 return True
-            ledger.reserved += reserve
-            group.create_task(worker(unit, reserve))
+            group.create_task(worker(unit, gate))
     return False
 
 
@@ -310,6 +373,7 @@ async def run(
     repo_root: Path,
     cost_fn: CostFn,
     timeout_usage_fn: TimeoutUsageFn,
+    reservation_fn: ReservationFn,
     token_estimate_fn: TokenEstimateFn,
     budget: RunBudget,
     run_id: str | None = None,
@@ -323,7 +387,8 @@ async def run(
     if not 1 <= concurrency <= CONCURRENCY:
         raise ValueError(f"concurrency must be 1..{CONCURRENCY}")
     index = _index(items)
-    requests = _Requests(cfg, prompt, sender, cost_fn, timeout_usage_fn, token_estimate_fn)
+    ledger = _Ledger(budget, cost_fn)
+    requests = _Requests(cfg, prompt, sender, ledger, timeout_usage_fn, reservation_fn, token_estimate_fn)
     adapter = sender.adapter
     run_id = run_id or default_run_id(cfg.id, split, sender.clock.now())
     run_dir = runs_dir / run_id
@@ -344,10 +409,9 @@ async def run(
     done = {r.item_id for r in rows}
     pending = [item for item in items if item.item_id not in done]
 
-    ledger = _Ledger(budget, cost_fn)
     warmup_keys = adapter.warmup_cache_keys(cfg)
     if pending:
-        first = sum(requests.reserve(WARMUP_TEXT) for _ in warmup_keys) + requests.reserve(pending[0].text)
+        first = sum(reservation_fn(WARMUP_TEXT) for _ in warmup_keys) + reservation_fn(pending[0].text)
         if not ledger.fits(first):
             raise BudgetExceeded(
                 f"{cfg.id}: spent ${budget.spent_before_usd:.4f} leaves no room for the first requests "
@@ -391,33 +455,35 @@ async def run(
     else:
         meta = existing
 
-    # Warm-ups (spec §4): one per cache key, all finished before the fan-out; a resume with items left warms again.
-    async def warmup(key: str | None) -> Warmup:
-        result = await requests.send(WARMUP_TEXT, key)
-        ledger.charge(result.attempts)
-        return Warmup(cache_key=key, attempts=result.attempts)
+    # Warm-ups (spec §4): one per cache key, all finished before the fan-out; a resume with items left warms
+    # again. Each completed warm-up is written to run.json at once, so a kill never loses a billed one.
+    async def warmup(key: str | None) -> None:
+        nonlocal meta
+        result = await requests.send(WARMUP_TEXT, key, requests.gate(WARMUP_TEXT))
+        if result.attempts:
+            warmups = [*meta.warmups, Warmup(cache_key=key, attempts=result.attempts)]
+            meta = meta.model_copy(update={"warmups": warmups, "totals": _totals(rows, warmups, cost_fn)})
+            _write_meta(run_dir, meta)
 
     if warmup_keys and pending:
-        warmups = await asyncio.gather(*(warmup(key) for key in warmup_keys))
-        meta = meta.model_copy(update={"warmups": [*meta.warmups, *warmups]})
-        meta = meta.model_copy(update={"totals": _totals(rows, meta.warmups, cost_fn)})
-        _write_meta(run_dir, meta)
+        async with asyncio.TaskGroup() as group:
+            for key in warmup_keys:
+                group.create_task(warmup(key))
 
     writer = _RowWriter(plain)
     try:
         stopped = await _fan_out(
             pending,
-            reserve_of=lambda item: requests.reserve(item.text),
+            gate_of=lambda item: requests.gate(item.text),
             process=requests.item_row,
             on_row=writer.write,
-            ledger=ledger,
             concurrency=concurrency,
         )
     finally:
         writer.close()
 
     rows = sorted(read_rows(run_dir), key=lambda r: index[r.item_id])
-    complete = not stopped and len(rows) == len(items)
+    complete = not stopped and not ledger.refused and len(rows) == len(items)
     _write_final_rows(run_dir, rows)
     meta = meta.model_copy(
         update={
@@ -443,64 +509,80 @@ async def retry_errors(
     repo_root: Path,
     cost_fn: CostFn,
     timeout_usage_fn: TimeoutUsageFn,
+    reservation_fn: ReservationFn,
     token_estimate_fn: TokenEstimateFn,
     budget: RunBudget,
     contract_tag: str = CONTRACT_TAG,
     concurrency: int = CONCURRENCY,
 ) -> RunMeta:
     """The single `--retry-errors` pass of a finalized run (spec §9.2): re-request only `api_error` rows
-    and rewrite them in place. A rewritten row keeps its earlier attempts, so their charges stay counted."""
+    and rewrite them in place. A rewritten row keeps its earlier attempts, so their charges stay counted;
+    only the attempts this invocation makes are charged against `budget`.
+
+    `run.json` marks the pass in progress before its first request, and every rewritten row is journaled
+    (fsynced) as it completes. Calling this again on a pass left in progress resumes it: journaled rows
+    are kept and only the rows not yet retried are requested.
+    """
     if not 1 <= concurrency <= CONCURRENCY:
         raise ValueError(f"concurrency must be 1..{CONCURRENCY}")
     meta = read_meta(run_dir)
     if meta.ended_at is None or not (run_dir / ITEMS_FINAL).exists():
         raise RunnerError(f"run {meta.run_id} is not finalized; resume it first")
-    if meta.retry_errors_passes >= 1:
+    if meta.retry_errors_passes >= 1 and not meta.retry_errors_in_progress:
         raise RunnerError(f"run {meta.run_id} already had its retry-errors pass")
     _check_identity(meta, _identity(cfg, prompt, meta.split, items))
     if meta.split in GUARDED_SPLITS and check_freeze(repo_root, contract_tag) != meta.contract_tag_commit:
         raise RunnerError(f"run {meta.run_id} was made under another contract tag commit")
 
+    journal = run_dir / ITEMS_RETRY
+    if journal.exists():
+        _drop_partial_line(journal)
     by_id = {item.item_id: item for item in items}
-    rows = read_rows(run_dir)
-    errors = [r for r in rows if r.status == "api_error"]
-    requests = _Requests(cfg, prompt, sender, cost_fn, timeout_usage_fn, token_estimate_fn)
+    retried = {r.item_id for r in read_retry_journal(run_dir)}
+    errors = [r for r in read_rows(run_dir) if r.status == "api_error" and r.item_id not in retried]
     ledger = _Ledger(budget, cost_fn)
-    if errors and not ledger.fits(requests.reserve(by_id[errors[0].item_id].text)):
+    requests = _Requests(cfg, prompt, sender, ledger, timeout_usage_fn, reservation_fn, token_estimate_fn)
+    if errors and not ledger.fits(reservation_fn(by_id[errors[0].item_id].text)):
         raise BudgetExceeded(f"{cfg.id}: no room under the ${budget.ceiling_usd:.4f} ceiling for the retry pass")
 
-    rewritten: dict[str, ItemRow] = {}
+    if not meta.retry_errors_in_progress:
+        meta = meta.model_copy(update={"retry_errors_passes": 1, "retry_errors_in_progress": True})
+        _write_meta(run_dir, meta)
 
-    async def process(row: ItemRow) -> ItemRow:
-        return await requests.item_row(by_id[row.item_id], earlier=row.attempts)
+    async def process(row: ItemRow, gate: _Gate) -> ItemRow:
+        return await requests.item_row(by_id[row.item_id], gate, earlier=row.attempts)
 
-    def keep(new_row: ItemRow) -> None:
-        rewritten[new_row.item_id] = new_row
+    writer = _RowWriter(journal)
+    try:
+        await _fan_out(
+            errors,
+            gate_of=lambda row: requests.gate(by_id[row.item_id].text),
+            process=process,
+            on_row=writer.write,
+            concurrency=concurrency,
+        )
+    finally:
+        writer.close()
 
-    await _fan_out(
-        errors,
-        reserve_of=lambda row: requests.reserve(by_id[row.item_id].text),
-        process=process,
-        on_row=keep,
-        ledger=ledger,
-        concurrency=concurrency,
-    )
-    rows = [rewritten.get(r.item_id, r) for r in rows]
+    rows = read_rows(run_dir)  # the finalized rows with the journaled ones in place
     _write_final_rows(run_dir, rows)
     meta = meta.model_copy(
         update={
             "returned_model_ids": sorted({r.model_id for r in rows if r.model_id is not None}),
-            "retry_errors_passes": meta.retry_errors_passes + 1,
-            "retry_errors_rewritten": meta.retry_errors_rewritten + len(rewritten),
+            "retry_errors_rewritten": len({r.item_id for r in read_retry_journal(run_dir)}),
+            "retry_errors_in_progress": False,
             "totals": _totals(rows, meta.warmups, cost_fn),
         }
     )
     _write_meta(run_dir, meta)
+    journal.unlink()
     return meta
 
 
 def run_validity(meta: RunMeta, rows: Sequence[ItemRow]) -> tuple[bool, str]:
     """Whether `decide` may use a run (spec §9.2): complete and an API error rate ≤ 0.5 %."""
+    if meta.retry_errors_in_progress:
+        return False, f"run {meta.run_id} has an unfinished retry-errors pass; resume it"
     if not meta.complete:
         return False, f"run {meta.run_id} is incomplete: {meta.incomplete_reason or 'not finalized'}"
     if not rows:

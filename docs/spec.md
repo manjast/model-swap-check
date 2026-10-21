@@ -298,12 +298,12 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 - **`invalid_output` (LLMs):** refusal stop reason, truncation at max tokens, unparseable JSON, intent not in the enum after case-insensitive matching, confidence missing or outside [0, 1].
 - **`invalid_output` (Jev):** a missing or extra answer key; a `choice` outside the criteria keys; `confidence` or Noul probability missing or outside [0, 1]; `probabilities` missing or summing outside 1 ± 0.01. A 400 (including `max_tokens_exceeded`) is `api_error`.
 - **Validity threshold:** a run is valid for `decide` only if its API error rate is ≤ 0.5%.
-- **Retry pass:** one `--retry-errors` pass per run rewrites `api_error` rows in place and records the count in `run.json`. `decide` accepts the run only if the rate is ≤ 0.5% after that pass.
+- **Retry pass:** one `--retry-errors` pass per run rewrites `api_error` rows in place and records the count in `run.json`. Rewritten rows keep their earlier attempts (still charged) and are journaled to `items.retry.jsonl` as they complete, with `retry_errors_in_progress` set in `run.json`, so a killed pass resumes instead of starting a second one. `decide` accepts the run only if the rate is ≤ 0.5% after that pass.
 
 ### 9.3 Run files and resume
 
 - **During a run:** rows are appended to `runs/<run_id>/items.jsonl`, flushed and fsynced per line.
-- **Resume:** the same `run_id` drops a trailing partial line and skips items already present.
+- **Resume:** the same `run_id` drops a trailing partial line and skips items already present. Each completed warm-up is written to `run.json` as it finishes.
 - **Finalize:** writes `items.jsonl.gz` and `run.json` and removes the plain file.
 - **New runs:** a new `run_id` always calls the API again, so `aa` is a genuine repeat.
 
@@ -316,11 +316,12 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 ### 9.5 Budget and freeze guards
 
 - **Caps:** `config/budget.yaml` caps OpenAI and Anthropic at $10 each and TypeSafe at $5 (Stefan's TypeSafe budget).
-- **Spent:** the cost of every attempt and warm-up across all run records. An attempt that timed out is charged as full uncached input plus max output tokens.
+- **Spent:** the cost of every attempt and warm-up across all run records, following provider billing (an Anthropic refusal before any output in an unbilled category — `cyber`, `general_harms` or none — costs $0; its reported counts are kept in `raw_output`). An attempt that timed out is charged as full uncached input plus max output tokens; "full input" is the whole request body the adapter sends, in `o200k_base` tokens, times a safety factor (1.0 OpenAI, 1.35 Anthropic and TypeSafe, for their own tokenizers and Claude's injected structured-output prompt; the pilot checks it).
+- **Admission:** every HTTP attempt, including retries and warm-ups, starts only if spent + the reservations of attempts in flight + its own reservation stays within the run's ceiling, and is charged when it ends. A reservation is the full-input estimate at the provider's highest input price (cache write where it is dearer) plus max output tokens.
 - **Pre-`dev` gate (after the pilot):** spent + every planned `dev` run + the mandatory `cert` runs (`inc`, `luna-none`, `aa` for OpenAI; `haiku55-off` for Anthropic), each × per-item p90 cost from the pilot, must stay ≤ cap − $0.50. If not, the `*-medium` `dev` run of that vendor is skipped, then `*-low`. Each `dev` run gets a spend ceiling that keeps the mandatory `cert` reserve; reaching it stops the run as incomplete without affecting later runs.
 - **Projection before the freeze (M4):** spent + every remaining planned run × per-item p90 cost from that configuration's `dev` run (`luna-none-x` uses its selected iteration).
 - **Drop order:** if the projection exceeds cap − $0.50 (the in-run stop level, so a plan that fits is never cut short), first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
-- **In-run stop:** a run stops when spent reaches cap − $0.50 and is marked incomplete; later runs for that provider do not start. Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
+- **In-run stop:** a run stops when spent reaches cap − $0.50 (or its admission no longer fits) and is marked incomplete; later `cert`/`aa` runs for that provider do not start (the CLI refuses them). Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
 - **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
 
@@ -335,7 +336,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 ### `runs/<run_id>/items.jsonl.gz`, one row per item
 
-- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars; Jev: the full response JSON, uncapped), `intent`, `confidence`, `probabilities` (Jev only, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
+- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars of model text, or for an unbilled refusal the reported `stop_details` and usage; Jev: the full response JSON, uncapped; `api_error`: the error body, ≤ 2,000 chars), `intent`, `confidence`, `probabilities` (Jev only, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
 - **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking). Jev usage maps to uncached input and output (output priced at $0).
 - **Ground truth:** not stored; `decide` joins it from the split.
 

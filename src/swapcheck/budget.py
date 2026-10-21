@@ -21,14 +21,16 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from swapcheck.configs import Configuration
+from swapcheck.freeze import GUARDED_SPLITS
 from swapcheck.groups import REPO_ROOT
-from swapcheck.records import Split
+from swapcheck.records import RUN_JSON, Split, read_meta
 
 BUDGET_PATH = REPO_ROOT / "config" / "budget.yaml"
 SPLIT_SIZES: dict[str, int] = {"dev": 3075, "cert": 9758, "aa": 3080}
 Level = Literal["low", "medium"]
 Vendor = Literal["openai", "anthropic"]
 NotRunReason = Literal["no dev gain", "budget"]
+BUDGET_STOP = "budget cap"  # `incomplete_reason` of a run stopped at its provider's cap - margin (§9.5)
 
 
 class BudgetConfig(BaseModel):
@@ -353,3 +355,20 @@ def next_cert_run(
             continue
         return run
     return None
+
+
+def stopped_providers(runs_dir: Path, configs: Mapping[str, Configuration], contract_tag_commit: str) -> set[str]:
+    """Providers with an in-run stop (spec §9.5): a `cert`/`aa` run under this contract tag commit that
+    ended incomplete at its provider's cap - margin. A `dev` run stopped at its own ceiling does not count."""
+    stopped: set[str] = set()
+    if not runs_dir.exists():
+        return stopped
+    for run_json in sorted(runs_dir.glob(f"*/{RUN_JSON}")):
+        meta = read_meta(run_json.parent)
+        if (
+            meta.split in GUARDED_SPLITS
+            and meta.contract_tag_commit == contract_tag_commit
+            and meta.incomplete_reason == BUDGET_STOP
+        ):
+            stopped.add(configs[meta.config_id].provider)
+    return stopped
