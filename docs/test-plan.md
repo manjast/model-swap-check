@@ -1,4 +1,4 @@
-# Test plan v2
+# Test plan v3
 
 Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4, §6) run in CI without API keys. The pilot (§5) is the only live check before `dev` runs. Tests that only show that a value was passed through, or that a mock echoed its input, do not belong here.
 
@@ -10,7 +10,8 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-D2 | Splits reproduce exactly: 250 `examples`, 3,075 `dev` (1,075 OOS), 9,758 `cert`, 3,080 `aa` ⊂ `cert`. `pilot` ⊂ `dev` has 100 items: one per in-scope intent plus 50 OOS. `examples`, `dev` and `cert` are pairwise disjoint and together cover all 13,083 rows | §2.3 |
 | T-D3 | `cert` slice sizes equal the §2.3 table and `analysis/power.py` `CERT_SLICES` | §2.3, §2.4 |
 | T-D4 | Intent groups: 50 in-scope intents, each in exactly one group; 27 OOS; union = the 77 Banking77 intents | §2.2, §2.4 |
-| T-D5 | Prompt: the catalog has exactly the 50 in-scope IDs. No OOS name occurs anywhere as a whole token, matched with `(?<![A-Za-z0-9_?])name(?![A-Za-z0-9_?])`, so `exchange_rate` inside `card_payment_wrong_exchange_rate` is not a hit. The instruction text also contains no OOS name in its space-separated form; descriptions and examples are exempt from that check because in-scope intents legitimately talk about "exchange rate". Stable prefix ≥ 1,100 `o200k_base` tokens. The user message is the raw customer text | §3.1 |
+| T-D5 | Prompt: the catalog has exactly the 50 in-scope IDs in alphabetical order. No OOS name occurs anywhere as a whole token, matched with `(?<![A-Za-z0-9_?])name(?![A-Za-z0-9_?])`, so `exchange_rate` inside `card_payment_wrong_exchange_rate` is not a hit. The instruction text also contains no OOS name in its space-separated form; descriptions and examples are exempt from that check because in-scope intents legitimately talk about "exchange rate". Stable prefix ≥ 1,100 `o200k_base` tokens. The user message is the raw customer text | §3.1 |
+| T-D7 | Jev translation: `prompts/jev-v1.yaml` carries exactly the instructions, descriptions and examples of `prompts/incumbent-v1.md` (compared field by field), in the same option order; `jev-c51` adds only the `out_of_scope` option, `jev-noul` only the Noul question | §3.1, §4.1 |
 | T-D6 | Leakage: no casefolded, whitespace-collapsed `cert` or `dev` text equals any prompt sentence or example. Every example comes from `examples`. Short accidental phrase hits need an allowlist entry with a reason | §2.5 |
 
 ## 2. Parsing, outcomes, metrics, thresholds, cost (M1–M2)
@@ -20,13 +21,15 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-P1 | Parser: valid output → `ok` with intent and confidence | §3.2 |
 | T-P2 | Parser: malformed JSON, missing field, unknown intent, confidence < 0, > 1 or non-numeric, refusal, truncation → `invalid_output` with the matching `error_code` | §3.2, §9.2 |
 | T-P3 | Parser: `refund_not_showing_up` → matches `Refund_not_showing_up`, `case_normalized = true`, counted in the run totals | §3.2 |
-| T-O1 | Routing table: every combination of status × intent (catalog / `out_of_scope`) × confidence vs τ (below / equal / above) × truth (same in-scope / other in-scope / OOS) gives the §3.3/§5 outcome | §3.3, §5 |
+| T-O1 | Routing table: every combination of status × intent (catalog / `out_of_scope`) × confidence vs τ (below / equal / above) × truth (same in-scope / other in-scope / OOS) gives the §3.3/§5 outcome; for `jev-noul`, a match probability below 0.5 escalates regardless of confidence and 0.5 itself does not | §3.3, §5 |
 | T-M1 | Metrics on a hand-built run of 20 items equal hand-computed W, A, V, top-1, OOS recall and API error rate, overall and per slice; weighted `dev` W equals a hand computation with the §5 weights | §5 |
 | T-M3 | Paired comparison drops items that are `api_error` in either arm and reports the count; `invalid_output` stays as escalation | §7.4 |
 | T-C1 | τ on constructed data: `τ_inc` is the smallest qualifying value in T(inc); 0 when everything auto-routed already meets 2%; `out_of_scope` and invalid predictions are excluded from T; void-experiment signal when unreachable; `τ_c` is matched to the incumbent's weighted W; `τ_c` = 1.01 when unreachable; raises if given any `cert` item | §6 |
 | T-B1 | Competence baseline on a hand-computed corpus of 6 documents and 2 intents: IDF refit per fold, L2 normalization and leave-one-out predictions equal the hand values | §3.4 |
-| T-X1 | D-X selection on fixture iteration results: highest weighted A wins, ties go to fewer changed lines, iteration 0 is never counted toward the limit of 3 | §8 |
-| T-K1 | Cost from hand-built attempt rows for both providers: billed (all attempts, warm-ups, a timed-out attempt charged as full input + max output), steady and sparse per 1,000 messages; mean and p90 per class | §9.5, §11 |
+| T-X1 | D-X selection on fixture iteration results: highest weighted A wins, ties go to fewer changed lines, iteration 0 is never counted toward the limit of 3 | §8.3 |
+| T-X2 | Reasoning selection on fixture `dev` results per vendor: `medium` chosen only at ≥ 1.0 pp over `low`; the chosen level certified only at ≥ 1.0 pp over no reasoning, otherwise "not certified" with the numbers; boundary values exactly at 1.0 pp included | §8.1 |
+| T-X3 | Jev design selection on fixture results: higher A wins, a tie goes to `jev-c51` | §8.2 |
+| T-K1 | Cost from hand-built attempt rows for all three providers: billed (all attempts, warm-ups, a timed-out attempt charged as full input + max output; TypeSafe input-only), steady and sparse per 1,000 messages; mean and p90 per class | §9.5, §11 |
 
 ## 3. Statistics and verdicts (M2)
 
@@ -47,7 +50,7 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 
 | ID | Test | Spec |
 |---|---|---|
-| T-R1 | Request snapshots per configuration: model ID, reasoning/thinking settings, temperature only where allowed, max tokens, identical JSON schema. Cache settings: OpenAI explicit breakpoint at the end of the developer message; Anthropic `cache_control` on the system block and none at top level; `prompt_cache_key` mapping for `inc` | §4, §3.2 |
+| T-R1 | Request snapshots per configuration: model ID, reasoning/thinking settings, temperature only where allowed, max tokens, identical JSON schema for the LLMs. Cache settings: OpenAI explicit breakpoint at the end of the developer message; Anthropic `cache_control` on the system block and none at top level; `prompt_cache_key` mapping for `inc`. Jev: pinned version ID (never an alias), state and question shapes per §4.1, reversed option order only in the pilot order-sensitivity run | §4, §4.1, §3.2 |
 | T-R2 | Response normalization from recorded real responses (pilot fixtures): text, usage classes incl. cache read/write and reasoning tokens, stop reason, request ID, returned model ID | §10 |
 | T-R3 | Retry policy with a fake transport: retryable codes are retried with backoff up to 6 attempts and `retry-after` is honoured; non-retryable codes are not retried; final failure → `api_error`; every attempt's usage is kept | §9.2, §10 |
 | T-R4 | Runner with a fake provider: concurrency ≤ 16; the configured RPM is never exceeded over any 60 s window; warm-ups (16 for `inc`) complete before the fan-out | §4, §9.4 |
@@ -57,19 +60,21 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-R8 | `decide` refuses a run whose API error rate is > 0.5%; after one `--retry-errors` pass it accepts only if the rate is ≤ 0.5% | §9.2 |
 | T-R9 | Records validate against the §10 field lists; ground truth is absent from item rows | §10 |
 | T-R10 | The runner appends each `cert`/`aa` run to `runs/manifest.yaml` at start. `decide` refuses a manifest entry whose configuration, prompt, schema or item-list hash, or contract tag commit, does not match the contract, and refuses when a run directory under the tag is missing from the manifest | §9.5, §10 |
-| T-R11 | `cert` run order and drop order: the planner orders runs as §9.1, drops `luna-low`, `haiku55-low`, `luna-none-x`, `aa` in that order, and stops a provider's M5 when the projection still exceeds its cap; after an in-run stop no later run for that provider starts | §9.1, §9.5 |
+| T-R11 | `cert` run order and drop order: the planner orders runs as §9.1, skips `luna-R`/`haiku55-R` when §8.1 does not certify them, drops `luna-R`, `haiku55-R`, `luna-none-x`, `aa` in that order, and stops a provider's M5 when the projection still exceeds its cap; after an in-run stop no later run for that provider starts | §9.1, §9.5 |
 
-## 5. Pilot acceptance (M3, live, ≈ $0.15)
+## 5. Pilot acceptance (M3, live, ≈ $0.30)
 
 | ID | Criterion | Spec |
 |---|---|---|
 | T-L1 | Smoke: each configuration has ≤ 1 invalid output in 100 and no API errors after retries | §5, §9.2 |
-| T-L2 | Cache: after warm-up, share of calls with cache reads measured and reported for every configuration; ≥ 90% expected for `luna-none`, `luna-low`, `haiku55-off`, `haiku55-low`; `inc` measured only (implicit, best-effort) | §4 |
+| T-L2 | Cache: after warm-up, share of calls with cache reads measured and reported for every LLM configuration; ≥ 90% expected for the Luna and Haiku 5.5 configurations; `inc` measured only (implicit, best-effort) | §4 |
 | T-L3 | Luna explicit vs implicit cache mode on the same items: reads, writes and billed cost recorded; the `cert` mode confirmed or changed with a reason | §14 |
 | T-L4 | Cost model built from measured token counts (§11); budget projection for `dev` and `cert` updated | §11 |
 | T-L5 | Every §14 open item has a recorded answer in `docs/pilot.md` | §14 |
 | T-L6 | Real responses saved as fixtures for T-R2, with request IDs kept and no secrets | §10 |
-| T-L7 | Latency p50/p95, overall and split by cache read, computed from the pilot records | §9.4 |
+| T-L7 | Latency p50/p95, overall and split by cache read, computed from the pilot records, for every configuration including Jev | §9.4 |
+| T-L8 | Jev option-order sensitivity: share of pilot items whose choice changes between normal and reversed option order, reported | §14 |
+| T-L9 | Reasoning tokens per item at `low` and `medium` for both vendors measured; the §11 estimate and the §9.5 projection updated before any `dev` run | §11 |
 
 ## 6. Replay and CI (M2, M5)
 
