@@ -9,7 +9,7 @@ from typing import Literal
 
 from swapcheck.records import Parsed, Usage
 
-RAW_OUTPUT_CAP = 2_000  # LLM `raw_output` is stored capped (spec §10); Jev keeps the full response JSON
+RAW_OUTPUT_CAP = 2_000  # LLM `raw_output` is stored capped (spec §10); Jev, `luna-dec` keep the full response JSON
 FIELDS = ("intent", "confidence")
 
 

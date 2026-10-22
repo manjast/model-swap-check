@@ -1,0 +1,37 @@
+{
+  "config_id": "luna-dec",
+  "http_status": 200,
+  "headers": {
+    "x-request-id": "req_dec_refusal_0002",
+    "openai-processing-ms": "142",
+    "openai-version": "2020-10-01",
+    "x-ratelimit-limit-requests": "30000",
+    "x-ratelimit-remaining-requests": "29999",
+    "x-ratelimit-reset-requests": "2ms",
+    "x-ratelimit-limit-tokens": "180000000",
+    "x-ratelimit-remaining-tokens": "179997682",
+    "x-ratelimit-reset-tokens": "0s",
+    "content-type": "application/json"
+  },
+  "body": {
+    "model": "gpt-6-luna",
+    "answers": [
+      {
+        "type": "refusal",
+        "name": "intent"
+      }
+    ],
+    "usage": {
+      "input_tokens": 2318,
+      "input_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "output_tokens": 0,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 2318
+    }
+  }
+}

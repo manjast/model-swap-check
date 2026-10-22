@@ -35,7 +35,8 @@ class ProviderAdapter(Protocol):
         ...
 
     def warmup_cache_keys(self, cfg: Configuration) -> list[str | None]:
-        """One entry per warm-up request (spec §4: 16 for `inc`, 1 for other LLMs, none for Jev)."""
+        """One entry per warm-up request (spec §4: 16 for `inc`, 1 for other Responses and Messages
+        configurations, none for Jev and `luna-dec`)."""
         ...
 
     def build_request(self, cfg: Configuration, prompt: Prompt, text: str, cache_key: str | None) -> HttpRequest: ...

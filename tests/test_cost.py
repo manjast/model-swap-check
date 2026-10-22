@@ -145,6 +145,25 @@ def test_k1_typesafe_input_only() -> None:
     assert m.reasoning_mean is None and m.reasoning_p95 is None
 
 
+# luna-dec (Decisions API): any reported cached tokens priced as input, output free, no warm-ups.
+LUNA_DEC_ROWS = [
+    row("train-1", ok(uncached_input=2400, output=5, reasoning=0)),  # 240
+    row("train-2", ok(uncached_input=400, cache_read=2000, output=5, reasoning=0)),  # 40 + 200 = 240
+]
+
+
+def test_k1_luna_dec_input_only_at_its_own_price_key() -> None:
+    cfg = CONFIGS["luna-dec"]
+    m = cost.cost_model(cfg, LUNA_DEC_ROWS, [], PRICES)
+    assert m.billed_per_1000 == pytest.approx(1000 * 480 * U / 2)
+    assert m.item_p90_usd == pytest.approx(240 * U)
+    assert m.steady_per_1000 == m.sparse_per_1000 == pytest.approx(1000 * 2400 * 0.10 * U)  # output free
+    # the same tokens through the Responses API (same model ID) cost differently: priced per API, not per model
+    usage = Usage(uncached_input=1_000_000, cache_read=1_000_000, cache_write=1_000_000, output=1_000_000)
+    assert cost.attempt_cost_usd(PRICES, cfg, usage) == pytest.approx(0.30)
+    assert cost.attempt_cost_usd(PRICES, CONFIGS["luna-none"], usage) != pytest.approx(0.30)
+
+
 TIMEOUT_TEXT = "I still have not received my new card, what should I do?"
 FIXTURES = Path(__file__).parent / "fixtures" / "responses"
 
@@ -157,7 +176,9 @@ def _estimate(prompt: Prompt, config_id: str, text: str = TIMEOUT_TEXT) -> int:
     return cost.input_token_estimate(CONFIGS[config_id], prompt, text)
 
 
-@pytest.mark.parametrize(("config_id", "max_output"), [("luna-none", 200), ("haiku55-medium", 4096), ("jev-noul", 0)])
+@pytest.mark.parametrize(
+    ("config_id", "max_output"), [("luna-none", 200), ("haiku55-medium", 4096), ("jev-noul", 0), ("luna-dec", 0)]
+)
 def test_k1_timeout_charged_as_full_input_plus_max_output(incumbent: Prompt, config_id: str, max_output: int) -> None:
     usage = cost.timeout_usage(CONFIGS[config_id], incumbent, TIMEOUT_TEXT)
     assert (usage.output, usage.cache_read, usage.cache_write) == (max_output, 0, 0)  # all input uncached
@@ -179,7 +200,7 @@ def test_k1_input_estimate_anthropic_not_below_openai(incumbent: Prompt) -> None
     assert _estimate(incumbent, "haiku55-medium") >= _estimate(incumbent, "luna-medium")
 
 
-@pytest.mark.parametrize("config_id", ["inc", "luna-none", "haiku55-off", "jev-c51"])
+@pytest.mark.parametrize("config_id", ["inc", "luna-none", "haiku55-off", "jev-c51", "luna-dec"])
 def test_k1_input_estimate_grows_with_the_text(incumbent: Prompt, config_id: str) -> None:
     long_text = TIMEOUT_TEXT + " It was meant to arrive last week and the app still says dispatched." * 20
     grown = _estimate(incumbent, config_id, long_text) - _estimate(incumbent, config_id)
@@ -201,9 +222,11 @@ def test_k1_input_estimate_covers_reported_input_of_doc_fixtures(incumbent: Prom
 
 def test_k1_every_configuration_is_priced() -> None:
     for cfg in CONFIGS.values():
-        PRICES.for_model(cfg.model)
+        PRICES.for_config(cfg)
     with pytest.raises(KeyError, match="no price"):
         cost.attempt_cost_usd(PRICES, CONFIGS["inc"].model_copy(update={"model": "gpt-4o-mini"}), Usage())
+    with pytest.raises(KeyError, match="no price"):  # the Decisions price key is per model
+        cost.attempt_cost_usd(PRICES, CONFIGS["luna-dec"].model_copy(update={"model": "gpt-6-luna-x"}), Usage())
 
 
 def _meta(run_id: str, cfg: Configuration, warmups: list[Warmup], complete: bool) -> RunMeta:

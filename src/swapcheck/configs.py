@@ -26,6 +26,7 @@ class Configuration(BaseModel):
     id: str
     provider: Provider
     model: str
+    api: Literal["decisions"] | None = None  # None: the provider's default API (OpenAI: Responses)
     prompt: str = DEFAULT_PROMPT
     max_output_tokens: int | None = None
     temperature: float | None = None
@@ -44,8 +45,18 @@ class Configuration(BaseModel):
     pilot_only: bool = False
 
     @property
-    def is_llm(self) -> bool:
-        return self.provider != "typesafe"
+    def is_decision_interface(self) -> bool:
+        """Jev and `luna-dec`: options in, typed choice with probabilities out (spec §3.2, §4.1, §4.2).
+
+        No JSON schema, output clause, max output tokens or warm-ups; the request design is the schema;
+        output is free; `raw_output` is the full response JSON, uncapped.
+        """
+        return self.provider == "typesafe" or self.api == "decisions"
+
+    @property
+    def price_key(self) -> str:
+        """The `config/prices.yaml` key: the model ID, or `<model>@decisions` for the Decisions API (§10)."""
+        return f"{self.model}@{self.api}" if self.api is not None else self.model
 
     @property
     def prompt_path(self) -> Path:

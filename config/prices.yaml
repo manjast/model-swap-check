@@ -37,3 +37,10 @@ models:
     cache_write: 0.0
     output: 0.0  # "Output tokens are free"
     source: https://docs.typesafe.ai/models.md
+
+  gpt-6-luna@decisions:  # luna-dec: gpt-6-luna behind POST /v1/decisions (spec §4.2)
+    uncached_input: 0.10
+    cache_read: 0.10  # "no cache-read ... charges": no discount stated; any reported cached tokens priced as input
+    cache_write: 0.10  # likewise priced as input (upper bound)
+    output: 0.0  # "You pay only for input tokens"
+    source: https://developers.openai.com/api/docs/guides/decisions.md

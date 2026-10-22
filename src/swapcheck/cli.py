@@ -28,24 +28,28 @@ def cmd_data(_: argparse.Namespace) -> int:
 
 
 def cmd_prompt(args: argparse.Namespace) -> int:
-    """Report the prompt's size and hash, and generate (or check) the Jev translation."""
+    """Report the prompt's size and hash, and generate (or check) the Jev and Decisions translations."""
     p = prompt.load_prompt()
     print(
         f"incumbent-v1: {len(p.catalog)} intents, prefix {prompt.prefix_tokens(p)} o200k tokens, "
         f"sha256 {p.sha256()[:16]}"
     )
-    expected = prompt.render_jev_yaml(p)
-    path = prompt.JEV_PROMPT
-    current = path.read_text(encoding="utf-8") if path.exists() else None
-    if current == expected:
-        print(f"{path.name}: up to date")
-        return 0
-    if args.check:
-        print(f"{path.name}: differs from the §4.1 translation; run `swapcheck prompt`")
-        return 1
-    path.write_text(expected, encoding="utf-8")
-    print(f"{path.name}: written")
-    return 0
+    translations = (
+        (prompt.JEV_PROMPT, prompt.render_jev_yaml(p), "§4.1"),
+        (prompt.DECISIONS_PROMPT, prompt.render_decisions_yaml(p), "§4.2"),
+    )
+    status = 0
+    for path, expected, section in translations:
+        current = path.read_text(encoding="utf-8") if path.exists() else None
+        if current == expected:
+            print(f"{path.name}: up to date")
+        elif args.check:
+            print(f"{path.name}: differs from the {section} translation; run `swapcheck prompt`")
+            status = 1
+        else:
+            path.write_text(expected, encoding="utf-8")
+            print(f"{path.name}: written")
+    return status
 
 
 def load_env(path: Path = REPO_ROOT / ".env") -> None:
@@ -85,7 +89,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             )
     run_prompt = prompt.load_prompt(cfg.prompt_path)
     items = data.load_splits(load_groups())[args.split]
-    adapter = get_adapter(cfg.provider)
+    adapter = get_adapter(cfg)
     api_key = os.environ.get(adapter.api_key_env)
     if not api_key:
         raise SystemExit(f"{adapter.api_key_env} is not set (put it in .env)")
@@ -156,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="swapcheck")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("data", help="download, verify and split Banking77").set_defaults(func=cmd_data)
-    p_prompt = sub.add_parser("prompt", help="check the prompt and generate the Jev translation")
+    p_prompt = sub.add_parser("prompt", help="check the prompt and generate the Jev and Decisions translations")
     p_prompt.add_argument("--check", action="store_true", help="fail instead of writing")
     p_prompt.set_defaults(func=cmd_prompt)
     p_run = sub.add_parser("run", help="run, resume or retry one configuration on one split")

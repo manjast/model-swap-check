@@ -1,12 +1,13 @@
-# Specification v3
+# Specification v4
 
-**Status:** draft for review, 2026-10-21. v2 incorporated an independent review of v1. v3 adds the reasoning-effort sweep and TypeSafe Jev. Binding for M0–M7 once merged. Values marked *(M4)* are fixed from `dev` data before the contract is frozen. Values marked *(pilot)* are resolved by the M3 pilot.
+**Status:** draft for review, 2026-10-21. v2 incorporated an independent review of v1. v3 adds the reasoning-effort sweep and TypeSafe Jev. v4 adds OpenAI's Decisions API (D-O). Binding for M0–M7 once merged. Values marked *(M4)* are fixed from `dev` data before the contract is frozen. Values marked *(pilot)* are resolved by the M3 pilot.
 
-**Question.** A production support-message router built on `gpt-4o-mini` has to move: OpenAI removes `gpt-4o-mini` from its API on 2027-01-14. There are three ways out:
+**Question.** A production support-message router built on `gpt-4o-mini` has to move: OpenAI removes `gpt-4o-mini` from its API on 2027-01-14. There are four ways out:
 
 - OpenAI's named successor, `gpt-6-luna`;
 - a rival LLM, `claude-haiku-5-5`;
-- a new class of model: TypeSafe's Jev, a "System One" decision model launched on 2026-09-15 that returns calibrated probabilities instead of text.
+- a new class of model: TypeSafe's Jev, a "System One" decision model launched on 2026-09-15 that returns calibrated probabilities instead of text;
+- OpenAI's answer to that class: the Decisions API (public beta since 2026-10-06), which puts `gpt-6-luna` behind a decision interface (questions with fixed options in, per-option probabilities and a confidence out). Comparing it with `luna-none` isolates the interface (same model family); comparing it with Jev isolates the model type (an LLM serving decisions vs a purpose-built decision model). How OpenAI runs Luna behind this endpoint is not documented.
 
 Which of them can take over without routing more messages wrongly, and at which setting? Every model is scored against Banking77's ground-truth labels. The old model sets the bar to clear, not the answer to copy. Each candidate gets one pre-registered, replayable verdict, and settings are chosen on `dev` data, not guessed.
 
@@ -21,6 +22,7 @@ Which of them can take over without routing more messages wrongly, and at which 
 | D-B1 | `inc` → `haiku55-off` | rival LLM, thinking disabled |
 | D-B2 | `inc` → `haiku55-R` | rival LLM at the effort selected on `dev` (§8.1); not run if `dev` shows no gain |
 | D-J | `inc` → `jev-D` | decision model, request design selected on `dev` (§8.2) |
+| D-O | `inc` → `luna-dec` | OpenAI's Decisions API on `gpt-6-luna` (§4.2) |
 | D-X | `inc` → `luna-none-x` | OpenAI's successor with a prompt adapted on `dev` (§8) |
 
 A migration here always includes recalibrating the confidence threshold on `dev` (§6); that is part of each candidate. Swapping only the model ID is reported descriptively (§7.5), without a verdict. Candidates are compared with the incumbent at its production setting, whatever their own reasoning level: `gpt-4o-mini` has no reasoning setting.
@@ -93,6 +95,7 @@ Seven slices: the six in-scope groups (assigned from intent names by the team a 
 
 - **LLMs:** `{"intent": <enum: 50 catalog IDs + "out_of_scope">, "confidence": <number>}`, both required, `additionalProperties: false`, through each provider's native structured-output mechanism. Claude's API supports no numeric bounds, so our parser checks `0 ≤ confidence ≤ 1` for every LLM. Enum values are matched case-insensitively (Claude's documented casing caveat); case-normalized matches are counted per run.
 - **Jev:** typed by the API. The Choice answer's `choice` is the intent and its `confidence` the confidence. The `probabilities` and, for `jev-noul`, the Noul probability are stored per item (§10).
+- **Decisions API:** typed by the API. The choice answer's `choice` is the intent and its `confidence` the confidence (undefined in OpenAI's docs; the pilot checks it against the probabilities, §14). The `probabilities` list is stored per item as a map. A `refusal` answer is `invalid_output`.
 
 ### 3.3 Routing policy with threshold τ
 
@@ -134,10 +137,11 @@ API errors are handled in §7.4, not by this policy.
 | `jev-c51` | TypeSafe `POST /v1/systemone` | `jev-1.13.0` (what `jev-latest` resolves to on 2026-10-21) | n/a | n/a | n/a (output is typed) | n/a |
 | `jev-noul` | same | `jev-1.13.0` | n/a | n/a | n/a | n/a |
 | `luna-none-x` | as `luna-none` | | | | | adapted prompt (§8.3) |
+| `luna-dec` | OpenAI `POST /v1/decisions` | `gpt-6-luna` (the only ID; no dated snapshot exists, so it cannot be pinned) | n/a (no setting) | n/a | n/a (output is typed) | none sent (OpenAI bills no cache reads or writes here) |
 
-`luna-R`, `haiku55-R` and `jev-D` name whichever configuration §8.1 and §8.2 select.
+`luna-R`, `haiku55-R` and `jev-D` name whichever configuration §8.1 and §8.2 select. `luna-dec`'s returned model ID is recorded per item; a change during the project is reported.
 
-- **Warm-up:** each LLM run first sends one warm-up request per cache key: 16 for `inc`, 1 for the other LLMs, none for Jev. Warm-ups use the fixed user message `Hello`, are recorded in `run.json` with their usage, and count as spent.
+- **Warm-up:** each LLM run first sends one warm-up request per cache key: 16 for `inc`, 1 for the other Responses and Messages configurations, none for Jev and `luna-dec`. Warm-ups use the fixed user message `Hello`, are recorded in `run.json` with their usage, and count as spent.
 - **Throughput:** concurrency 16, under the rate limits of §9.4.
 - **Recorded per item:** the model ID returned by the API.
 
@@ -150,6 +154,15 @@ The transformation from `prompts/incumbent-v1.md` is fixed; T-D7 checks that app
 - **`jev-noul`:** Choice `instructions` = `routing_instruction` only, so it does not mention an option that does not exist. A Noul question in the same request: `instructions` = `{"question": "Does the customer message ask about any of the topics in catalog?", "catalog": {<intent>: <description>, … in catalog order}}`.
 - **Model:** pinned by version ID, never by alias.
 - **Option order:** TypeSafe documents a lean toward the first option, so the pilot reverses the 50 intents (keeping `out_of_scope` last) for both designs and reports order sensitivity per design (§14).
+
+### 4.2 Decisions API requests (`luna-dec`)
+
+Generated from `prompts/incumbent-v1.md` by a fixed transformation into `prompts/decisions-v1.yaml`, never edited by hand (T-D8). One design only: OpenAI's guide recommends a fallback option for inputs no category covers, which is the same pattern as the incumbent's `out_of_scope` enum value and as `jev-c51`.
+
+- **Body:** `model` = `gpt-6-luna`; `input` = the customer message string, unchanged; `questions` = one `choice` question named `intent`.
+- **`instructions`:** `routing_instruction` + " " + `oos_clause`, verbatim. `output_clause` is dropped (typed output).
+- **`choices`:** the 50 catalog intents in catalog order, each `{"value": <intent>, "description": <description> + " Example: " + <example message>}` (the API has no example field, so the example travels in the description and both decision models receive the same information), then `{"value": "out_of_scope", "description": "The customer message is about none of the other options."}`.
+- **Option order:** the pilot also runs the 50 intents reversed (`out_of_scope` kept last) and reports order sensitivity (§14), as for Jev.
 
 ## 5. Outcomes and metrics
 
@@ -197,14 +210,14 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 
 - **Release errors:** each verdict is a single intersection–union test at α = 5% one-sided. G1–G3 all have to pass, so no correction is needed within a decision.
 - **Harm side:** corrected over the 7 slices (G2 FAIL rule).
-- **Family-adjusted status:** each decision record also reports the gates at U and L for one-sided 1 − 0.05/6 (Bonferroni over the 6 decisions). This answers "is any of the options safe?", which is the question a reader picking the best option implicitly asks. Decisions not run do not reduce the divisor.
+- **Family-adjusted status:** each decision record also reports the gates at U and L for one-sided 1 − 0.05/7 (Bonferroni over the 7 decisions). This answers "is any of the options safe?", which is the question a reader picking the best option implicitly asks. Decisions not run do not reduce the divisor.
 - **Noise floor rule:** if the A/A comparison (§7.6) is FAIL on G1 or G2, every verdict becomes INCONCLUSIVE with that reason.
 - **Cost and latency** are reported, not gated (deployment assumption, §1). Two flags never change the verdict: `COST` if steady-traffic cost > 1.5× the incumbent's, `LATENCY` if p95 > 2× the incumbent's. Reasoning/thinking tokens per message are reported next to latency as a speed measure that does not depend on our network.
 
 ### 7.3 Margins *(M4)*
 
 - **Grid:** δ_W ∈ {0.50, 0.75, 1.00} pp; δ_S ∈ {1.5, 2.0, 2.5, 3.0} pp. Business meaning: 0.5 pp = 5 more misrouted messages per 1,000.
-- **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across the LLM candidate configurations in the final `cert` plan, taken after the §9.5 budget plan, each at its τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%. Jev is excluded from this input, so a structurally different model cannot loosen every LLM decision's margins; D-J uses the same margins (one business tolerance for every candidate) and its record states its own power at them, computed the same way from its `dev` discordance.
+- **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across the LLM candidate configurations in the final `cert` plan, taken after the §9.5 budget plan, each at its τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%. The two decision interfaces (Jev and `luna-dec`) are excluded from this input, so a structurally different output cannot loosen every LLM decision's margins; D-J and D-O use the same margins (one business tolerance for every candidate) and each record states its own power at them, computed the same way from its `dev` discordance.
 - **Selection:** `analysis/power.py --pdisc-json` simulates G1 + G2 with the same Tango bound and the calibration noise of §6. It selects the first pair, ordered by δ_W then δ_S, whose joint power for an equally good candidate is ≥ 80%.
 - **Fallback:** if none reaches 80%, use (1.00, 3.0) and write the power into the contract.
 - **Planning estimate:** with assumed discordance 3–8% (doubled for OOS), joint power at (1.00, 3.0) is 66–95% (`python analysis/power.py`).
@@ -223,7 +236,7 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 
 ### 7.5 Naive-swap analysis (descriptive)
 
-Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes. D-J reports "not applicable": Jev's confidence is on a different scale, and moving to Jev is not a model-ID swap.
+Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes. D-J and D-O report "not applicable": their confidence comes from a decision interface on a different scale, and moving to either is not a model-ID swap.
 
 ### 7.6 Noise floor
 
@@ -287,9 +300,9 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 | Phase | Split | Configurations |
 |---|---|---|
-| Pilot (M3) | `pilot` | all ten configurations in §4 except `luna-none-x`; plus `luna-none` in implicit cache mode (caching comparison) and both Jev designs with reversed option order (order sensitivity) |
-| Dev (M4) | `dev` | in this order: `inc` (§3.4 first); `jev-c51`, `jev-noul`; `luna-none`, `haiku55-off`; `luna-low`, `haiku55-low`; D-X iterations; `luna-medium`, `haiku55-medium` last (either may already have been skipped by the pre-`dev` gate, §9.5) |
-| Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-none-x`, `luna-R`; Anthropic `haiku55-off`, `haiku55-R`; TypeSafe `jev-D`. `R` runs only if §8.1 certifies it. Exactly one run per configuration and split under a contract tag (§9.5) |
+| Pilot (M3) | `pilot` | all eleven configurations in §4 except `luna-none-x`; plus `luna-none` in implicit cache mode (caching comparison), and both Jev designs and `luna-dec` with reversed option order (order sensitivity) |
+| Dev (M4) | `dev` | in this order: `inc` (§3.4 first); `jev-c51`, `jev-noul`, `luna-dec`; `luna-none`, `haiku55-off`; `luna-low`, `haiku55-low`; D-X iterations; `luna-medium`, `haiku55-medium` last (either may already have been skipped by the pre-`dev` gate, §9.5) |
+| Cert (M5) | `cert` | in this order: OpenAI `inc`, `luna-none`, `aa` (`inc` on `aa`), `luna-dec`, `luna-none-x`, `luna-R`; Anthropic `haiku55-off`, `haiku55-R`; TypeSafe `jev-D`. `R` runs only if §8.1 certifies it. Exactly one run per configuration and split under a contract tag (§9.5) |
 
 ### 9.2 Errors and retries
 
@@ -297,6 +310,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 - **Not retried:** 400, 401, 403, 404, 422 → `api_error`; also a 429 whose body reports an exhausted quota or spend limit (OpenAI `insufficient_quota` and the spend/credit-limit codes), which retrying cannot fix.
 - **`invalid_output` (LLMs):** refusal stop reason, truncation at max tokens, unparseable JSON, intent not in the enum after case-insensitive matching, confidence missing or outside [0, 1].
 - **`invalid_output` (Jev):** a missing or extra answer key; a `choice` outside the criteria keys; `confidence` or Noul probability missing or outside [0, 1]; `probabilities` missing or summing outside 1 ± 0.01. A 400 (including `max_tokens_exceeded`) is `api_error`.
+- **`invalid_output` (Decisions API):** not exactly one answer, or its `name` is not `intent`; a `refusal` answer; a `choice` outside the choice values; `confidence` missing or outside [0, 1]; `probabilities` missing, with values other than the choice values, or summing outside 1 ± 0.01.
 - **Validity threshold:** a run is valid for `decide` only if its API error rate is ≤ 0.5%.
 - **Retry pass:** one `--retry-errors` pass per run rewrites `api_error` rows in place and records the count in `run.json`. Rewritten rows keep their earlier attempts (still charged) and are journaled to `items.retry.jsonl` as they complete, with `retry_errors_in_progress` set in `run.json`, so a killed pass resumes instead of starting a second one. `decide` accepts the run only if the rate is ≤ 0.5% after that pass.
 
@@ -315,12 +329,12 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 ### 9.5 Budget and freeze guards
 
-- **Caps:** `config/budget.yaml` caps OpenAI and Anthropic at $10 each and TypeSafe at $5 (Stefan's TypeSafe budget).
+- **Caps:** `config/budget.yaml` caps OpenAI at $15 (raised from $10 when D-O was added), Anthropic at $10 and TypeSafe at $5 (Stefan's TypeSafe budget).
 - **Spent:** the cost of every attempt and warm-up across all run records, following provider billing (an Anthropic refusal before any output in an unbilled category — `cyber`, `general_harms` or none — costs $0; its reported counts are kept in `raw_output`). An attempt that timed out is charged as full uncached input plus max output tokens; "full input" is the whole request body the adapter sends, in `o200k_base` tokens, times a safety factor (1.0 OpenAI, 1.35 Anthropic and TypeSafe, for their own tokenizers and Claude's injected structured-output prompt; the pilot checks it).
 - **Admission:** every HTTP attempt, including retries and warm-ups, starts only if spent + the reservations of attempts in flight + its own reservation stays within the run's ceiling, and is charged when it ends. A reservation is the full-input estimate at the provider's highest input price (cache write where it is dearer) plus max output tokens.
 - **Pre-`dev` gate (after the pilot):** spent + every planned `dev` run + the mandatory `cert` runs (`inc`, `luna-none`, `aa` for OpenAI; `haiku55-off` for Anthropic), each × per-item p90 cost from the pilot, must stay ≤ cap − $0.50. If not, the `*-medium` `dev` run of that vendor is skipped, then `*-low`. Each `dev` run gets a spend ceiling that keeps the mandatory `cert` reserve; reaching it stops the run as incomplete without affecting later runs.
 - **Projection before the freeze (M4):** spent + every remaining planned run × per-item p90 cost from that configuration's `dev` run (`luna-none-x` uses its selected iteration).
-- **Drop order:** if the projection exceeds cap − $0.50 (the in-run stop level, so a plan that fits is never cut short), first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
+- **Drop order:** if the projection exceeds cap − $0.50 (the in-run stop level, so a plan that fits is never cut short), first apply the §8.1 substitution (`medium` → `low`), then drop planned `cert` runs in this order until it fits: `luna-R`, `haiku55-R`, `luna-none-x`, `luna-dec`, `aa`. If it still does not fit, M5 does not start for that provider. The resulting plan is written into the contract; dropped decisions are NOT RUN (`budget`); a missing `aa` leaves the verdicts standing with a "noise floor not measured" warning.
 - **In-run stop:** a run stops when spent reaches cap − $0.50 (or its admission no longer fits) and is marked incomplete; later `cert`/`aa` runs for that provider do not start (the CLI refuses them). Decisions that need an incomplete run become INCONCLUSIVE (insufficient data). Every decision needs `inc`, which is therefore run first.
 - **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
@@ -336,8 +350,8 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 ### `runs/<run_id>/items.jsonl.gz`, one row per item
 
-- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars of model text, or for an unbilled refusal the reported `stop_details` and usage; Jev: the full response JSON, uncapped; `api_error`: the error body, ≤ 2,000 chars), `intent`, `confidence`, `probabilities` (Jev only, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
-- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking). Jev usage maps to uncached input and output (output priced at $0).
+- **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars of model text, or for an unbilled refusal the reported `stop_details` and usage; Jev and `luna-dec`: the full response JSON, uncapped; `api_error`: the error body, ≤ 2,000 chars), `intent`, `confidence`, `probabilities` (Jev and `luna-dec`, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
+- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking). Jev usage maps to uncached input and output (output priced at $0). `luna-dec` usage maps like the Responses API; its output is priced at $0.
 - **Ground truth:** not stored; `decide` joins it from the split.
 
 ### `runs/manifest.yaml`
@@ -346,7 +360,7 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
 
 ### Other files
 
-- **`config/prices.yaml`:** price per model and token class, with source URL and retrieval date. Cost is always computed from it.
+- **`config/prices.yaml`:** price per price key and token class, with source URL and retrieval date. The price key is the model ID, except for `luna-dec`, priced as `gpt-6-luna@decisions` ($0.10 per million input tokens; no output charge; any reported cached tokens are priced as input, since OpenAI states that no cache-read discount applies). Cost is always computed from it.
 - **`decisions/<decision_id>.md`** (generated):
   - verdict and conditions;
   - gate table (estimate, Tango bound, Wald bound, margin, status) and family-adjusted status;
@@ -369,7 +383,7 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
 
 | Provider | Pilot + `dev` + `cert` without a reasoning variant | + `R` = `low` in `cert` | + `R` = `medium` in `cert` |
 |---|---|---|---|
-| OpenAI | ≈ $6.80 | + ≈ $1.90 | + ≈ $5.40 (does not fit the cap; dropped first) |
+| OpenAI | ≈ $7.30 + D-O ≈ $3.10 = ≈ $10.40 (prefix 2,344 tokens) | + ≈ $1.90 | + ≈ $5.40 (does not fit the $15 cap; `low` substituted or dropped) |
 | Anthropic | ≈ $3.40 | + ≈ $2.15 | + ≈ $5.60 |
 | TypeSafe | ≈ $2.80 (input only, $0.042 per million tokens; both designs on `dev`) | — | — |
 
@@ -377,8 +391,8 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 
 ## 12. Repository and workflow
 
-- **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The three APIs are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
-- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev translation, `--check` in CI), `run`, `decide`, `report`.
+- **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The four APIs (OpenAI Responses and Decisions, Anthropic Messages, TypeSafe System One) are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
+- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run`, `decide`, `report`.
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
 
@@ -409,3 +423,7 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 | OpenAI server timing header (`openai-processing-ms`, documented) present on Responses calls | pilot |
 | Jev option-order sensitivity, per design: share of pilot items whose choice changes when the 50 intents are reversed (`out_of_scope` kept last) | pilot (reported; a share > 5% for the selected design is stated as a limitation in the D-J record) |
 | Jev latency from this machine (TypeSafe's docs: "most queries complete in about 100 ms", measured at its own location) | pilot |
+| `luna-dec` option-order sensitivity (as for Jev) | pilot (reported; a share > 5% is stated as a limitation in the D-O record) |
+| Decisions API `confidence`: which function of the probabilities it is (OpenAI does not define it; the documented examples fit `(p_max − 1/n) / (1 − 1/n)`, as for Jev) | pilot |
+| Decisions API: reported `cached_tokens`, `x-request-id` and rate-limit headers present; returned model ID | pilot |
+| `luna-dec` latency from this machine (OpenAI: "up to 10x faster than GPT-6 Luna through the Responses API") | pilot |

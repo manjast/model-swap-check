@@ -49,7 +49,7 @@ from swapcheck.records import (
 from swapcheck.schema import schema_sha256
 
 CONCURRENCY = 16  # spec §4
-MAX_RAW_OUTPUT_CHARS = 2_000  # LLMs only; Jev keeps the full response JSON (spec §10)
+MAX_RAW_OUTPUT_CHARS = 2_000  # LLMs only; decision interfaces keep the full response JSON (spec §10)
 STATUSES = ("ok", "invalid_output", "api_error")
 MAX_API_ERROR_RATE = (5, 1000)  # 0.5 %, compared exactly in integers (spec §9.2)
 
@@ -213,7 +213,7 @@ def _row(cfg: Configuration, item_id: str, result: SendResult, earlier: Sequence
             model_id=None,
             attempts=attempts,
         )
-    raw = parsed.raw_output[:MAX_RAW_OUTPUT_CHARS] if cfg.is_llm else parsed.raw_output
+    raw = parsed.raw_output if cfg.is_decision_interface else parsed.raw_output[:MAX_RAW_OUTPUT_CHARS]
     return ItemRow(
         item_id=item_id,
         status=parsed.status,
