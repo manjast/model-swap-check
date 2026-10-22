@@ -1,0 +1,82 @@
+{
+  "run_id": "haiku55-medium-dev-20261022T112709Z",
+  "config_id": "haiku55-medium",
+  "config_sha256": "7032b95643d8e9e9f0eb5baa48ee62e404b73ebd9a9e6d148637183448addae7",
+  "split": "dev",
+  "item_list_sha256": "d9b48997e5687359b338e47a0a1d763be0b8ca6533786f50b8b2c2beb04d1734",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719",
+  "requested_model": "claude-haiku-5-5",
+  "returned_model_ids": [
+    "claude-haiku-5-5"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0",
+    "anthropic-version": "2023-06-01"
+  },
+  "git_commit": "a6bbe2fc74b52c84cdba371c3791ff446e68356b",
+  "contract_tag_commit": null,
+  "warmups": [
+    {
+      "cache_key": null,
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 9,
+            "cache_read": 4369,
+            "cache_write": 0,
+            "output": 23,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1643.674269958865,
+          "request_id": "req_011CgHCGd61cGzVHkDBL6afY",
+          "retry_after_s": null,
+          "headers": {
+            "anthropic-ratelimit-input-tokens-limit": "500000",
+            "anthropic-ratelimit-input-tokens-remaining": "500000",
+            "anthropic-ratelimit-input-tokens-reset": "2026-10-22T11:27:11Z",
+            "anthropic-ratelimit-output-tokens-limit": "80000",
+            "anthropic-ratelimit-output-tokens-remaining": "80000",
+            "anthropic-ratelimit-output-tokens-reset": "2026-10-22T11:27:11Z",
+            "anthropic-ratelimit-requests-limit": "1000",
+            "anthropic-ratelimit-requests-remaining": "999",
+            "anthropic-ratelimit-requests-reset": "2026-10-22T11:27:10Z",
+            "anthropic-ratelimit-tokens-limit": "580000",
+            "anthropic-ratelimit-tokens-remaining": "580000",
+            "anthropic-ratelimit-tokens-reset": "2026-10-22T11:27:11Z"
+          }
+        }
+      ]
+    }
+  ],
+  "started_at": "2026-10-22T11:27:09Z",
+  "ended_at": "2026-10-22T11:46:29Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 3075,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 100688,
+      "cache_read": 13439044,
+      "cache_write": 0,
+      "output": 392958,
+      "reasoning": 285095
+    },
+    "billed_usd": 0.34093824,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}

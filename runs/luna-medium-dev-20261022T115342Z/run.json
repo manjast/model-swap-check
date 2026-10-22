@@ -1,0 +1,76 @@
+{
+  "run_id": "luna-medium-dev-20261022T115342Z",
+  "config_id": "luna-medium",
+  "config_sha256": "0b208e75627d21eccd45e861897b9d9094adc455a597a25579d0d22fe21b695c",
+  "split": "dev",
+  "item_list_sha256": "d9b48997e5687359b338e47a0a1d763be0b8ca6533786f50b8b2c2beb04d1734",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719",
+  "requested_model": "gpt-6-luna",
+  "returned_model_ids": [
+    "gpt-6-luna"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "93ebf7d4f2e7ce2ed062e0c53fee3967ad22649b",
+  "contract_tag_commit": null,
+  "warmups": [
+    {
+      "cache_key": null,
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 8,
+            "cache_read": 0,
+            "cache_write": 2648,
+            "output": 35,
+            "reasoning": 13
+          },
+          "usage_estimated": false,
+          "latency_ms": 2372.1574989613146,
+          "request_id": "req_f4ea74cfb4aa475cb1c90f6286347710",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "871",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "2000000",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "0s"
+          }
+        }
+      ]
+    }
+  ],
+  "started_at": "2026-10-22T11:53:42Z",
+  "ended_at": "2026-10-22T12:07:25Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 3075,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 152285,
+      "cache_read": 8142600,
+      "cache_write": 2648,
+      "output": 375667,
+      "reasoning": 182795
+    },
+    "billed_usd": 0.284819,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}
