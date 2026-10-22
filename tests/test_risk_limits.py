@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from swapcheck.records import ItemRow, read_rows
 from swapcheck.risk_limits import write_risk_limits
 
 LIMITS = [0.01, 0.05]
-TAUS = {"inc": (0.95, 0.0), "luna-none": (0.97, 0.6), "jev-noul": (0.9, 0.0)}
+TAUS = {"inc": (0.95, 0.0), "luna-none": (0.6, 0.97), "jev-noul": (0.9, 0.0)}
+Z = 1.6448536269514722  # one-sided 95% normal quantile
 
 
 def _v3(base: Contract) -> Contract:
@@ -62,6 +64,7 @@ def test_v6_report_hand_counts_pairing_and_j2_signal(tmp_path: Path) -> None:
         "luna-none": ({r.item_id: r for r in read_rows(runs / "golden-luna-none-cert")}, False),
         "jev-noul": ({r.item_id: r for r in noul_rows}, True),
     }
+    verdicts = set()
     for cid, (rows, gated) in arms.items():
         kept = [i for i in rows if rows[i].status != "api_error" and inc_rows[i].status != "api_error"]
         assert len(kept) == len(items) - (1 if cid == "luna-none" else 0)
@@ -74,9 +77,15 @@ def test_v6_report_hand_counts_pairing_and_j2_signal(tmp_path: Path) -> None:
             diff = (len(auto) - inc_auto) / len(kept) * 100
             section = text.split(f"## Limit {LIMITS[k] * 100:g}%")[1].split("##")[0]
             assert re.search(rf"^\| `{cid}` \|.* \| {diff:.2f} pp \[", section, re.MULTILINE), (cid, k)
+            n, p = len(kept), len(wrong) / len(kept)
+            upper = (p + Z**2 / (2 * n) + Z * math.sqrt(p * (1 - p) / n + Z**2 / (4 * n * n))) / (1 + Z**2 / n)
+            held = f"{upper * 100:.2f} pp: {'below' if upper < LIMITS[k] else 'not below'} {LIMITS[k] * 100:g}%"
+            assert f"| {held} |" in section, (cid, k, held)
+            verdicts.add(upper < LIMITS[k])
         assert _summary(text, cid) == cells
     # Without the J2 gate more jev-noul answers would route at 0.9, so the hand counts above detect a missing gate.
     assert sum(_auto(r, 0.9, True) for r in noul_rows) < sum(_auto(r, 0.9, False) for r in noul_rows)
+    assert verdicts == {True, False}  # the fixture exercises both sides of the limit comparison
 
 
 def test_v6_report_refuses_foreign_tag_changed_hash_and_missing_thresholds(tmp_path: Path) -> None:
