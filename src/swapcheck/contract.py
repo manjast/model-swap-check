@@ -13,6 +13,7 @@ from swapcheck.records import Split
 
 CONTRACT_PATH = REPO_ROOT / "contracts" / "contract-v1.yaml"
 CONTRACT_V2_PATH = REPO_ROOT / "contracts" / "contract-v2.yaml"
+CONTRACT_V3_PATH = REPO_ROOT / "contracts" / "contract-v3.yaml"
 
 
 class ContractConfiguration(BaseModel):
@@ -92,6 +93,20 @@ class JevPolicy(BaseModel):
     records: dict[str, object]
 
 
+class RiskLimits(BaseModel):
+    """Spec §7.10 (amendment 3), descriptive: each configuration's own §6-rule tau at several weighted dev W limits,
+    on the `cert` runs of the contracts they were made under (`jev-noul` on §7.9's J2 signal)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    limits: list[float]
+    run_contracts: dict[str, str]  # configuration -> tag of the contract its cert run was made under
+    thresholds: dict[str, list[Calibration]]  # configuration -> one per limit, in `limits` order
+    incumbent_fixed: list[Calibration]  # the incumbent at fixed, unfitted thresholds
+    code_version: str
+    records: dict[str, object]
+
+
 class Contract(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore")
 
@@ -100,6 +115,7 @@ class Contract(BaseModel):
     item_lists: dict[Split, str]  # split -> item-list SHA-256 (spec §10)
     analysis: AnalysisContract | None = None
     jev_policy: JevPolicy | None = None  # contract-v2 only (spec §7.9)
+    risk_limits: RiskLimits | None = None  # contract-v3 only (spec §7.10)
 
 
 def load_contract(path: Path = CONTRACT_PATH) -> Contract:

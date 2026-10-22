@@ -225,6 +225,30 @@ def cmd_jev_policy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_risk_limits(args: argparse.Namespace) -> int:
+    """Replay the amendment 3 risk-limit report (spec §7.10)."""
+    from swapcheck.contract import load_contract
+    from swapcheck.decide import DecisionRefusal
+    from swapcheck.risk_limits import write_risk_limits
+
+    groups = load_groups()
+    items = data.load_splits(groups)["cert"]
+    try:
+        write_risk_limits(
+            args.runs_dir,
+            load_contract(args.base_contract),
+            load_contract(args.jev_contract),
+            load_contract(args.contract),
+            items,
+            groups,
+            args.output_dir,
+        )
+    except DecisionRefusal as exc:
+        print(str(exc))
+        return 2
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Write measured dev discordance for margin selection."""
     from swapcheck.contract import load_contract
@@ -265,6 +289,13 @@ def main(argv: list[str] | None = None) -> int:
     p_jev.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v2.yaml")
     p_jev.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
     p_jev.set_defaults(func=cmd_jev_policy)
+    p_limits = sub.add_parser("risk-limits", help="replay the amendment 3 risk-limit report (spec §7.10)")
+    p_limits.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
+    p_limits.add_argument("--base-contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")
+    p_limits.add_argument("--jev-contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v2.yaml")
+    p_limits.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v3.yaml")
+    p_limits.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
+    p_limits.set_defaults(func=cmd_risk_limits)
     p_report = sub.add_parser("report", help="write final-plan own-threshold dev discordance")
     p_report.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
     p_report.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")

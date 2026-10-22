@@ -66,6 +66,32 @@ Jev's 0% above comes from how it reports confidence, not from how it routes. On 
 
 At the operating points its API makes available, Jev automates about as much as the best LLM candidate (`luna-none-x`: 42.89% at 1.54% W). Neither rule stays clearly below the 2% limit, though. J2 was fitted on `dev` to 1.88% and lands at 2.03% on `cert`, and its upper bound of 2.28% is above 2%. The LLM candidates' upper bounds are 1.46–1.76%. Most of Jev's excess sits in `transfers` and `out_of_scope`, as it does for every candidate. D-J's registered verdict is unchanged.
 
+## Amendment 3: risk-limit sensitivity (§7.10, descriptive)
+
+The 2% limit is an operator's setting (20 misrouted messages per 1,000), not a property of the models, so amendment 3 repeats the comparison at 1, 2, 5, 10 and 15%. Each configuration gets its own threshold from `dev` by the §6 rule at each limit; `jev-noul` uses the J2 signal. No new run.
+
+- **Timeline:** the amendment text was committed and pushed at 17:19 UTC (`3f7b03b`), before any `cert` estimate at a limit other than 2%. The thresholds were frozen in `contracts/contract-v3.yaml`, and `contract-v3` was tagged at `1a4f374` after an independent review that re-derived all 35 thresholds and the two fixed incumbent points from the `dev` runs. The report was computed after the tag.
+- **Record:** `decisions/A3-limits.md`, written by `swapcheck risk-limits` and replayed by CI. At 2% it reproduces the §7.8 and §7.9 numbers.
+
+`cert` W / A at each configuration's own threshold (9,758 paired items, none dropped):
+
+| Configuration | ≤ 1% | ≤ 2% | ≤ 5% | ≤ 10% | ≤ 15% |
+|---|---|---|---|---|---|
+| `inc` | 0.00 / 2.05 | 0.00 / 2.05 | 0.00 / 2.05 | 0.00 / 2.05 | 14.98\* / 72.37 |
+| `luna-none` | 0.00 / 0.07 | 1.30 / 34.75 | 4.12 / 50.20 | 4.12 / 50.20 | 12.91 / 71.26 |
+| `luna-none-x` | 0.07 / 13.15 | 1.54 / **42.89** | 1.54 / 42.89 | 7.65 / 63.86 | 12.45 / **73.16** |
+| `haiku55-off` | 0.42 / **19.98** | 1.26 / 34.80 | 2.80 / 46.88 | 7.69 / 63.01 | 7.69 / 63.01 |
+| `luna-dec` | 0.73 / 15.87 | 1.49 / 25.32 | 4.83\* / 47.27 | 9.84\* / 62.71 | 14.31 / 70.40 |
+| `jev-c51` | 0.00 / 0.00 | 0.00 / 0.00 | 4.48 / **53.63** | 9.46 / **66.19** | 14.83\* / 74.90 |
+| `jev-noul` (J2) | 0.46 / 16.11 | 2.03\* / 40.88 | 3.81 / 46.97 | 3.81 / 46.97 | 3.81 / 46.97 |
+
+In %. \* = the one-sided 95% upper bound of W is not below the limit. **Bold** = the highest A among the configurations whose upper bound is below the limit.
+
+- **The incumbent has no setting between 2% and 72%.** `gpt-4o-mini` states its confidence in steps of 0.05. Below a 14% limit its threshold stays at 0.95, where it automates 2.05%; the next step, 0.90, automates 72.37% with 14.98% of messages misrouted. With no confidence gate (τ = 0) it misroutes 26.82% and automates 87.47%. So at every limit from 2% to 10%, each LLM candidate automates 25–64% of traffic against the incumbent's 2%. At 1%, `luna-none` automates 0.07%, less than the incumbent. At 15%, the LLM candidates' A differences against the incumbent range from −9.36 to +0.79 pp, and across all candidates, Jev included, from −25.40 to +2.53 pp.
+- **The leader depends on the limit.** Among the configurations whose upper bound of W is below the limit, Haiku 5.5 leads at 1%, Luna with the adapted prompt at 2%, Jev (`jev-c51`) at 5% and 10%, and the adapted Luna again at 15%. At 1%, `luna-none` and `jev-c51` automate almost nothing: their confidence piles up at the top of the scale too.
+- **The `dev` thresholds mostly held on `cert`.** Every point estimate of W stays at or below its limit except J2 at 2% (2.03%). The upper bound reaches the limit for J2 at 2%, `luna-dec` at 5% and 10%, and `jev-c51` and the incumbent at 15%.
+- **Some signals run out.** Across the tested limits, J2 automates at most 46.97%: at 5%, 10% and 15% its threshold stays at 0.13. The only lower threshold, 0, would also admit answers below Choice confidence 1.00 that pass the catalog and Noul gates. `haiku55-off` keeps the same threshold, 0.62, at 10% and 15%.
+
 ## Process notes
 
 - The NOT RUN decisions were written to the manifest with `swapcheck.manifest.add_not_run`, from the contract's budget plan, because no CLI command writes them; `decide` checks that they equal the frozen plan.
