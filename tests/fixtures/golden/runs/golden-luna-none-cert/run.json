@@ -1,0 +1,43 @@
+{
+  "complete": true,
+  "config_id": "luna-none",
+  "config_sha256": "12b1c30bb3dd9335cdd7c9bf984841d82e815f8e1423657c89d545c2fae6ef35",
+  "contract_tag_commit": "0123456789abcdef0123456789abcdef01234567",
+  "ended_at": "2026-10-21T12:01:00+00:00",
+  "git_commit": "0123456789abcdef0123456789abcdef01234567",
+  "incomplete_reason": null,
+  "item_list_sha256": "985045187a6cde95b6974139aa64fd82591b77355638a9499ebd26da6942eca1",
+  "prompt_sha256": "71723b19023a87fbd0f353b3c8292e49736b2df36e969e99751e1cb46a8ac1d4",
+  "requested_model": "gpt-6-luna",
+  "retry_errors_in_progress": false,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "returned_model_ids": [
+    "gpt-6-luna"
+  ],
+  "run_id": "golden-luna-none-cert",
+  "schema_sha256": "35fad3c74c5625ea72593136e1489209b7d282c4597bf5c685c737ebb04c1f97",
+  "split": "cert",
+  "started_at": "2026-10-21T12:00:00+00:00",
+  "totals": {
+    "billed_usd": 0.01,
+    "by_status": {
+      "api_error": 1,
+      "ok": 209
+    },
+    "case_normalized": 0,
+    "n_429": 0,
+    "tokens": {
+      "cache_read": 94500,
+      "cache_write": 0,
+      "output": 2520,
+      "reasoning": null,
+      "uncached_input": 31500
+    }
+  },
+  "versions": {
+    "python": "3.13",
+    "swapcheck": "0.1.0"
+  },
+  "warmups": []
+}
