@@ -103,7 +103,7 @@ class FakeAdapter:
         return headers.get("x-request-id")
 
     def rate_limit_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
-        return {}
+        return {k: v for k, v in headers.items() if k.startswith("x-ratelimit-")}
 
 
 def ok_body(

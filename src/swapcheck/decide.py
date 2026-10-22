@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 from swapcheck.budget import NOISE_FLOOR_WARNING
 from swapcheck.configs import Configuration, load_configurations
-from swapcheck.contract import AnalysisContract, Contract
+from swapcheck.contract import AnalysisContract, Contract, OrderSensitivity
 from swapcheck.cost import Prices, cost_model, load_prices
 from swapcheck.data import Item, item_list_hash
 from swapcheck.groups import IntentGroups
@@ -254,6 +254,16 @@ def _noise(inc: AnalysisRun, aa: AnalysisRun | None, a: AnalysisContract) -> tup
     return failed, lines
 
 
+def _order_sensitivity(cfg: str, s: OrderSensitivity | None) -> str:
+    """The pilot's option-order measurement; above 5% it is a stated limitation (spec §14)."""
+    if s is None:
+        return f"Option-order sensitivity of `{cfg}`: not recorded."
+    line = f"Option-order sensitivity (pilot): {s.changed}/{s.items} choices changed with the 50 intents reversed."
+    if 20 * s.changed > s.items:  # share > 5 %, compared exactly
+        line += " Limitation: above 5%, so this verdict holds for the catalog order used here only."
+    return line
+
+
 def _render(
     decision: str,
     index: int,
@@ -284,6 +294,8 @@ def _render(
             f"Use adapted prompt SHA-256 `{a.selections.dx_prompt_sha256}` "
             f"(dev iteration {a.selections.dx_iteration}), not the incumbent prompt."
         )
+    if decision in ("D-J", "D-O"):
+        lines.append(_order_sensitivity(cfg, a.order_sensitivity.get(cfg)))
     lines += [
         f"Paired n={len(ir)}; dropped API-error/absent items={paired.dropped}.",
         f"Frozen dev W={pp(a.configurations[cfg].dev_w)}; A={pp(a.configurations[cfg].dev_a)}; "

@@ -1,0 +1,45 @@
+{
+  "run_id": "jev-c51-reversed-pilot-20261022T091703Z",
+  "config_id": "jev-c51-reversed",
+  "config_sha256": "adf585d3610c16fbd7220b231025baed6c45c54ebb526c35b0e25d03343314fe",
+  "split": "pilot",
+  "item_list_sha256": "d34dfba232eea140878aa23b6dd864191de83b7544dfeb96ff147efd0bed5025",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "2d575b1f866d8dad2126be2a1374e0131e5866c0907285c463d2d873460e7383",
+  "requested_model": "jev-1.13.0",
+  "returned_model_ids": [
+    "jev-1.13.0"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "34b9eb0336075a6d8378908fa7988f0b23c6c19f",
+  "contract_tag_commit": null,
+  "warmups": [],
+  "started_at": "2026-10-22T09:17:03Z",
+  "ended_at": "2026-10-22T09:17:27Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 100,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 346537,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 56093,
+      "reasoning": null
+    },
+    "billed_usd": 0.014554554,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}

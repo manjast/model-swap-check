@@ -5,6 +5,7 @@ Analysis code: `synthetic-golden-v1`; decision_index=6.
 **Verdict: BLOCK**
 
 Conditions: candidate τ = 0.70; incumbent τ = 0.70.
+Option-order sensitivity (pilot): 14/100 choices changed with the 50 intents reversed. Limitation: above 5%, so this verdict holds for the catalog order used here only.
 Paired n=210; dropped API-error/absent items=0.
 Frozen dev W=0.00 pp; A=80.00 pp; power at frozen margins=65.00 pp.
 

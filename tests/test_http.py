@@ -143,14 +143,18 @@ def test_r3_rate_limit_429_is_retried() -> None:
     assert send(sender).parsed is not None
 
 
-def test_r3_every_attempt_keeps_usage_latency_and_request_id() -> None:
+def test_r3_every_attempt_keeps_usage_latency_request_id_and_limit_headers() -> None:
     clock = FakeClock()
     sender, _ = scripted(
         [
             httpx.ReadTimeout("slow"),
             httpx.ConnectError("refused"),
-            httpx.Response(500, headers={"x-request-id": "req-500"}),
-            ok(),
+            httpx.Response(500, headers={"x-request-id": "req-500", "x-ratelimit-remaining-requests": "9"}),
+            httpx.Response(
+                200,
+                json=ok_body(),
+                headers={"x-request-id": "req-ok", "x-ratelimit-limit-tokens": "1000", "x-other": "y"},
+            ),
         ],
         clock,
         latency_s=0.25,
@@ -160,7 +164,10 @@ def test_r3_every_attempt_keeps_usage_latency_and_request_id() -> None:
     assert (timeout.error, timeout.usage, timeout.usage_estimated) == ("timeout", timeout_usage("hi"), True)
     assert (connection.error, connection.usage, connection.usage_estimated) == ("connection", Usage(), False)
     assert (server.error, server.request_id, server.usage) == ("http_500", "req-500", Usage())
+    assert server.headers == {"x-ratelimit-remaining-requests": "9"}
     assert (final.error, final.request_id, final.usage) == (None, "req-ok", CFG_USAGE)
+    assert final.headers == {"x-ratelimit-limit-tokens": "1000"}
+    assert timeout.headers == connection.headers == {}
     assert [a.latency_ms for a in result.attempts] == [250.0, 250.0, 250.0, 250.0]
 
 
