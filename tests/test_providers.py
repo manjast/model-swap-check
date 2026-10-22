@@ -292,24 +292,140 @@ def _parse(name: str, prompt: Prompt) -> tuple[Parsed, str | None, dict[str, str
     return adapter.parse_response(cfg, prompt, body), adapter.request_id(headers), adapter.rate_limit_headers(headers)
 
 
-def test_r2_openai_inc_ok(incumbent: Prompt) -> None:
-    parsed, request_id, limits = _parse("doc-openai-inc-ok.json", incumbent)
-    assert (parsed.status, parsed.intent, parsed.confidence) == ("ok", "card_arrival", 0.93)
-    assert parsed.raw_output == '{"intent":"card_arrival","confidence":0.93}'
-    assert parsed.model_id == "gpt-4o-mini-2024-07-18"
-    assert parsed.stop_reason == "completed"
-    # cache_write_tokens absent on pre-5.6 models → 0
-    assert parsed.usage == Usage(uncached_input=290, cache_read=1920, cache_write=0, output=14, reasoning=0)
-    assert request_id == "req_inc_ok_0001"
-    assert limits == {
-        "openai-processing-ms": "412",
-        "x-ratelimit-limit-requests": "30000",
-        "x-ratelimit-remaining-requests": "29999",
-        "x-ratelimit-reset-requests": "2ms",
-        "x-ratelimit-limit-tokens": "150000000",
-        "x-ratelimit-remaining-tokens": "149997600",
-        "x-ratelimit-reset-tokens": "0s",
-    }
+# Real pilot responses (T-L6). Expected values are read off each body by hand: usage classes follow billing
+# (uncached = input - cache read - cache write; reasoning is part of output).
+PILOT_EXPECTED: dict[str, tuple[str, float, Usage, str | None, str, str]] = {
+    # fixture: (intent, confidence, usage, stop reason, model, request ID)
+    "pilot-inc.json": (
+        "why_verify_identity",
+        0.9,
+        Usage(uncached_input=234, cache_read=2432, output=14, reasoning=0),
+        "completed",
+        "gpt-4o-mini-2024-07-18",
+        "req_224b3a38572b46ac8630a4b6e6881981",
+    ),
+    "pilot-luna-none.json": (
+        "exchange_charge",
+        0.91,
+        Usage(uncached_input=20, cache_read=2648, output=19, reasoning=0),
+        "completed",
+        "gpt-6-luna",
+        "req_144d0dd314e3434fa7ac880a855f381b",
+    ),
+    "pilot-luna-low.json": (  # a reasoning item precedes the message
+        "fiat_currency_support",
+        0.88,
+        Usage(uncached_input=13, cache_read=2648, output=49, reasoning=26),
+        "completed",
+        "gpt-6-luna",
+        "req_d3a712bf84eb4063adcaca0310b3ad1a",
+    ),
+    "pilot-luna-low-warmup.json": (
+        OUT_OF_SCOPE,
+        0.99,
+        Usage(uncached_input=8, cache_write=2648, output=20, reasoning=0),
+        "completed",
+        "gpt-6-luna",
+        "req_3c82facf0e204fb3bc019f6e223952ad",
+    ),
+    "pilot-haiku55-off.json": (  # JSON with spaces after the separators
+        "cancel_transfer",
+        0.9,
+        Usage(uncached_input=22, cache_read=4368, output=25, reasoning=0),
+        "end_turn",
+        "claude-haiku-5-5",
+        "req_011CgH2LCW6z5Kkubjz1TifJ",
+    ),
+    "pilot-haiku55-off-warmup.json": (
+        OUT_OF_SCOPE,
+        0.9,
+        Usage(uncached_input=9, cache_write=4368, output=22, reasoning=0),
+        "end_turn",
+        "claude-haiku-5-5",
+        "req_011CgH2JrVoYo8mgs39WMP3A",
+    ),
+    "pilot-haiku55-low.json": (  # an empty thinking block precedes the text
+        OUT_OF_SCOPE,
+        0.6,
+        Usage(uncached_input=24, cache_read=4369, output=334, reasoning=311),
+        "end_turn",
+        "claude-haiku-5-5",
+        "req_011CgH2P1GkZvikQYpXH7V6c",
+    ),
+    "pilot-jev-c51.json": (
+        OUT_OF_SCOPE,
+        0.88,
+        Usage(uncached_input=3463, output=560),
+        None,
+        "jev-1.13.0",
+        "req_01a162e5f6ca77d294a1a587836f061e",
+    ),
+    "pilot-jev-noul.json": (
+        "card_arrival",
+        1.0,
+        Usage(uncached_input=4791, output=568),
+        None,
+        "jev-1.13.0",
+        "req_01a162e6e1f272b38b1125b9379b6434",
+    ),
+    "pilot-luna-dec.json": (
+        "direct_debit_payment_not_recognised",
+        0.9,
+        Usage(uncached_input=2316, output=0, reasoning=0),
+        None,
+        "gpt-6-luna",
+        "req_72dc2cddfc534d8e8c2563f9963924d7",
+    ),
+}
+
+
+def test_r2_every_pilot_fixture_has_an_expectation() -> None:
+    assert {p.name for p in FIXTURES.glob("pilot-*.json")} == set(PILOT_EXPECTED)
+
+
+@pytest.mark.parametrize("name", sorted(PILOT_EXPECTED))
+def test_r2_pilot_response(incumbent: Prompt, name: str) -> None:
+    intent, confidence, usage, stop_reason, model, req = PILOT_EXPECTED[name]
+    cfg, _, body = _fixture(name)
+    parsed, request_id, limits = _parse(name, incumbent)
+    assert (parsed.status, parsed.error_code, parsed.case_normalized) == ("ok", None, False)
+    assert (parsed.intent, parsed.confidence, parsed.stop_reason, parsed.model_id) == (
+        intent,
+        confidence,
+        stop_reason,
+        model,
+    )
+    assert parsed.usage == usage
+    assert request_id == req
+    if cfg.provider == "openai":
+        assert {"openai-processing-ms", "x-ratelimit-limit-requests", "x-ratelimit-limit-tokens"} <= set(limits)
+    if cfg.provider == "anthropic":
+        assert {"anthropic-ratelimit-requests-limit", "anthropic-ratelimit-input-tokens-limit"} <= set(limits)
+    if cfg.is_decision_interface:
+        assert json.loads(parsed.raw_output) == body  # full response JSON kept
+
+
+def test_r2_pilot_jev_and_decisions_probabilities(incumbent: Prompt) -> None:
+    """Jev c51 and Decisions return the 51 enum values (Decisions as a list, mapped by value); Jev noul the
+    50 intents plus a separate match probability."""
+    for name, keys in (
+        ("pilot-jev-c51.json", incumbent.enum),
+        ("pilot-luna-dec.json", incumbent.enum),
+        ("pilot-jev-noul.json", incumbent.enum[:-1]),
+    ):
+        cfg, _, body = _fixture(name)
+        parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
+        assert parsed.probabilities is not None and sorted(parsed.probabilities) == sorted(keys)
+        assert sum(parsed.probabilities.values()) == pytest.approx(1.0, abs=0.01)
+    _, _, body = _fixture("pilot-luna-dec.json")
+    (answer,) = body["answers"]
+    parsed = get_adapter(CONFIGS["luna-dec"]).parse_response(CONFIGS["luna-dec"], incumbent, body)
+    assert parsed.probabilities == {p["value"]: p["probability"] for p in answer["probabilities"]}
+    assert attempt_cost_usd(PRICES, CONFIGS["luna-dec"], parsed.usage) == pytest.approx(2316 * 0.10e-6)
+    noul = get_adapter(CONFIGS["jev-noul"]).parse_response(
+        CONFIGS["jev-noul"], incumbent, _fixture("pilot-jev-noul.json")[2]
+    )
+    assert noul.match_probability == 0.99
 
 
 def test_r2_openai_cache_write_reasoning_and_case_normalization(incumbent: Prompt) -> None:
@@ -319,12 +435,6 @@ def test_r2_openai_cache_write_reasoning_and_case_normalization(incumbent: Promp
     assert parsed.usage == Usage(uncached_input=39, cache_read=0, cache_write=2201, output=212, reasoning=196)
     assert parsed.model_id == "gpt-6-luna"
     assert request_id == "req_luna_write_0002"
-
-
-def test_r2_openai_cache_read(incumbent: Prompt) -> None:
-    parsed, _, _ = _parse("doc-openai-luna-none-cache-read.json", incumbent)
-    assert (parsed.status, parsed.intent, parsed.confidence) == ("ok", OUT_OF_SCOPE, 0.71)
-    assert parsed.usage == Usage(uncached_input=35, cache_read=2201, cache_write=0, output=15, reasoning=0)
 
 
 def test_p2_r2_openai_refusal(incumbent: Prompt) -> None:
@@ -429,30 +539,6 @@ def test_p2_r2_anthropic_truncation(incumbent: Prompt) -> None:
     assert parsed.usage.output == 4096 and parsed.usage.reasoning == 4096
 
 
-def test_r2_jev_c51(incumbent: Prompt) -> None:
-    parsed, request_id, _ = _parse("doc-typesafe-c51-ok.json", incumbent)
-    _, _, body = _fixture("doc-typesafe-c51-ok.json")
-    answer = body["answers"]["intent"]
-    assert (parsed.status, parsed.intent, parsed.confidence) == ("ok", "card_arrival", answer["confidence"])
-    assert parsed.probabilities == answer["probabilities"]
-    assert parsed.probabilities is not None and list(parsed.probabilities) == incumbent.enum
-    assert parsed.match_probability is None
-    assert parsed.model_id == "jev-1.13.0"
-    assert parsed.usage == Usage(uncached_input=1832, output=34)
-    assert json.loads(parsed.raw_output) == body
-    assert request_id == "ts_req_c51_0001"
-
-
-def test_r2_jev_noul(incumbent: Prompt) -> None:
-    parsed, request_id, _ = _parse("doc-typesafe-noul-ok.json", incumbent)
-    _, _, body = _fixture("doc-typesafe-noul-ok.json")
-    assert (parsed.status, parsed.intent) == ("ok", "Refund_not_showing_up")
-    assert parsed.match_probability == 0.93
-    assert parsed.probabilities == body["answers"]["intent"]["probabilities"]
-    assert json.loads(parsed.raw_output) == body
-    assert request_id == "ts_req_noul_0002"
-
-
 def test_r2_raw_output_capped_for_llms_only(incumbent: Prompt) -> None:
     cfg, _, body = _fixture("doc-anthropic-off-cache-write.json")
     long_text = '{"intent": "card_arrival", "confidence": 0.9' + " " * 3000 + "}"
@@ -549,22 +635,6 @@ def test_p2_jev_reversed_order_accepts_same_criteria(incumbent: Prompt) -> None:
 
 
 # --- T-R2, T-P2: Decisions API (`luna-dec`) ------------------------------------------------------------------------
-
-
-def test_r2_decisions_ok(incumbent: Prompt) -> None:
-    parsed, request_id, limits = _parse("doc-openai-decisions-ok.json", incumbent)
-    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
-    (answer,) = body["answers"]
-    assert (parsed.status, parsed.intent, parsed.confidence) == ("ok", "card_arrival", 0.949)
-    assert parsed.probabilities == {p["value"]: p["probability"] for p in answer["probabilities"]}
-    assert parsed.probabilities is not None and list(parsed.probabilities) == incumbent.enum
-    assert (parsed.match_probability, parsed.case_normalized, parsed.stop_reason) == (None, False, None)
-    assert parsed.model_id == "gpt-6-luna"
-    assert parsed.usage == Usage(uncached_input=2318, output=0, reasoning=0)
-    assert json.loads(parsed.raw_output) == body
-    assert request_id == "req_dec_ok_0001"
-    assert limits["x-ratelimit-limit-requests"] == "30000" and limits["openai-processing-ms"] == "142"
-    assert attempt_cost_usd(PRICES, cfg, parsed.usage) == pytest.approx(2318 * 0.10e-6)
 
 
 def test_r2_decisions_usage_classes_and_input_only_cost(incumbent: Prompt) -> None:

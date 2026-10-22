@@ -48,6 +48,15 @@ class SelectionRecords(BaseModel):
     records: dict[str, object]
 
 
+class OrderSensitivity(BaseModel):
+    """Pilot items whose choice changed when the 50 intents were reversed (spec §14)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    changed: int
+    items: int
+
+
 class AnalysisContract(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -64,6 +73,7 @@ class AnalysisContract(BaseModel):
     code_version: str
     budget: BudgetPlan
     selections: SelectionRecords
+    order_sensitivity: dict[str, OrderSensitivity]  # decision-interface configuration ID -> pilot measurement
 
 
 class Contract(BaseModel):

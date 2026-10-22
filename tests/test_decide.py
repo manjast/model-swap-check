@@ -138,6 +138,10 @@ def test_records_deterministic_rounded_short_not_run_and_interfaces(tmp_path: Pa
     assert "Reason: budget" in one["D-B2"]
     assert "## Gates" not in one["D-A2"] and "## Gates" not in one["D-B2"]
     assert "not applicable" in one["D-J"] and "not applicable" in one["D-O"]
+    # golden pilot measurements: luna-dec 14/100 is a limitation; jev-noul's 5/100 is exactly 5%, so it is not
+    assert "14/100 choices changed" in one["D-O"] and "Limitation: above 5%" in one["D-O"]
+    assert "5/100 choices changed" in one["D-J"] and "Limitation" not in one["D-J"]
+    assert "Option-order" not in one["D-A1"]
     assert "not applicable" not in one["D-A1"]
     assert "Wilson" in one["D-A1"] and "0.00 pp" in one["D-A1"]
     assert "Family-adjusted" in one["D-A1"]

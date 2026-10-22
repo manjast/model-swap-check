@@ -51,6 +51,7 @@ class Attempt(BaseModel):
     latency_ms: float | None = None
     request_id: str | None = None
     retry_after_s: float | None = None
+    headers: dict[str, str] = {}  # the response's rate-limit and timing headers (spec §9.4), keys lowercased
 
 
 class Parsed(BaseModel):

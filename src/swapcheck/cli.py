@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
+import sys
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from swapcheck import data, prompt
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, load_groups
+
+# Request-ID headers of the three providers, plus the content type; nothing account-identifying.
+CAPTURED_HEADERS = frozenset({"x-request-id", "request-id", "x-typesafe-request-id", "content-type"})
 
 
 def cmd_data(_: argparse.Namespace) -> int:
@@ -102,10 +109,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     reason = budget_mod.BUDGET_STOP if ceiling == limit else "spend ceiling"
     print(f"{cfg.id} on {args.split} ({len(items)} items): {cfg.provider} spent ${spent:.4f}, ceiling ${ceiling:.2f}")
 
+    captured = 0
+
+    def capture(status: int, headers: httpx.Headers, body: Mapping[str, Any]) -> None:
+        """Save a 2xx response in the T-R2 fixture format; only request-ID, rate-limit and timing headers.
+        A failed save is reported and skipped: the paid response must still be parsed and recorded."""
+        nonlocal captured
+        captured += 1
+        kept = adapter.rate_limit_headers(headers) | {k: v for k, v in headers.items() if k in CAPTURED_HEADERS}
+        doc = {"config_id": cfg.id, "http_status": status, "headers": kept, "body": body}
+        path = args.capture_dir / f"{cfg.id}-{captured:03d}.json"
+        try:
+            path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"capture skipped: {path}: {exc}", file=sys.stderr)
+
+    if args.capture_dir is not None:
+        args.capture_dir.mkdir(parents=True, exist_ok=True)
+
     async def go() -> int:
         async with httpx.AsyncClient() as client:
             limiter = RateLimiter(limit_for(load_limits(), cfg), SystemClock())
-            sender = Sender(client, adapter, api_key, limiter=limiter)
+            sender = Sender(
+                client, adapter, api_key, limiter=limiter, capture=capture if args.capture_dir is not None else None
+            )
             budget = runner.RunBudget(spent, ceiling, reason=reason)
             estimate = TokenEstimator(cfg, run_prompt)
 
@@ -196,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--run-id", help="resume this run (same configuration and split)")
     p_run.add_argument("--retry-errors", metavar="RUN_ID", help="the single API-error retry pass of a finished run")
     p_run.add_argument("--ceiling-usd", type=float, help="absolute provider spend at which this run stops")
+    p_run.add_argument("--capture-dir", type=Path, help="also save every 2xx response here (pilot fixtures, T-L6)")
     p_run.set_defaults(func=cmd_run)
     p_decide = sub.add_parser("decide", help="replay certification evidence into frozen decision records")
     p_decide.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")

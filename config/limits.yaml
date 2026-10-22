@@ -1,23 +1,29 @@
 # Rate limits per provider (spec §9.4), enforced by a sliding window in the limit's own unit.
-# Values are 80% of the account limits. These initial values are placeholders: the M3 pilot
-# replaces them from response headers (OpenAI `x-ratelimit-limit-*`, Anthropic
-# `anthropic-ratelimit-*`) and, for TypeSafe, from its console (no header is documented).
-# `tokens` is compared with the per-request estimate: o200k_base tokens of the developer
-# message + the customer text, plus max output tokens for OpenAI (which counts them).
+# Values are 80% of the account limits read from the pilot's response headers on 2026-10-22
+# (docs/pilot.md). `tokens` is compared with the per-request estimate: o200k_base tokens of the
+# developer message + the customer text, plus max output tokens for OpenAI (which counts them).
 # A provider may list per-model overrides under `models`.
 
 openai:
+  # x-ratelimit-limit-requests 5,000 and x-ratelimit-limit-tokens 2,000,000, identical for
+  # gpt-4o-mini-2024-07-18, gpt-6-luna (Responses) and gpt-6-luna (Decisions)
   per: minute
-  requests: 400
-  tokens: 400000
-
-anthropic:
-  # 80% of Start tier: 1,000 RPM and 2,000,000 input tokens per minute
-  per: minute
-  requests: 800
+  requests: 4000
   tokens: 1600000
 
+anthropic:
+  # claude-haiku-5-5: 1,000 requests, 500,000 input tokens, 80,000 output tokens per minute.
+  # Anthropic counts only uncached input and cache writes toward the input limit, while the estimate
+  # counts the whole prompt, so this binds at about 170 requests per minute: input use stays far
+  # below the limit, and output at the pilot's p90 (292 tokens at `medium`) about 50,000 per minute,
+  # under 80% of the output limit, which the limiter does not track separately.
+  per: minute
+  requests: 800
+  tokens: 400000
+
 typesafe:
+  # No rate-limit header is returned and the docs point to the console; not yet read from it.
+  # The pilot ran these values with no 429.
   per: second
   requests: 5
   tokens: 20000

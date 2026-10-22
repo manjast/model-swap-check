@@ -5,6 +5,7 @@ Analysis code: `synthetic-golden-v1`; decision_index=5.
 **Verdict: INCONCLUSIVE**
 
 Conditions: candidate τ = 0.70; incumbent τ = 0.70.
+Option-order sensitivity (pilot): 5/100 choices changed with the 50 intents reversed.
 Paired n=210; dropped API-error/absent items=0.
 Frozen dev W=0.00 pp; A=80.00 pp; power at frozen margins=65.00 pp.
 

@@ -54,6 +54,7 @@ def contract() -> Contract:
                     "dx_prompt_sha256": "test",
                     "records": {},
                 },
+                "order_sensitivity": {},
             }
         ),
     )

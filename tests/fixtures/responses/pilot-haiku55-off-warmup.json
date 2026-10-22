@@ -1,0 +1,53 @@
+{
+  "config_id": "haiku55-off",
+  "http_status": 200,
+  "headers": {
+    "anthropic-ratelimit-input-tokens-limit": "500000",
+    "anthropic-ratelimit-input-tokens-remaining": "498000",
+    "anthropic-ratelimit-input-tokens-reset": "2026-10-22T09:16:37Z",
+    "anthropic-ratelimit-output-tokens-limit": "80000",
+    "anthropic-ratelimit-output-tokens-remaining": "80000",
+    "anthropic-ratelimit-output-tokens-reset": "2026-10-22T09:16:37Z",
+    "anthropic-ratelimit-requests-limit": "1000",
+    "anthropic-ratelimit-requests-remaining": "999",
+    "anthropic-ratelimit-requests-reset": "2026-10-22T09:16:34Z",
+    "anthropic-ratelimit-tokens-limit": "580000",
+    "anthropic-ratelimit-tokens-remaining": "578000",
+    "anthropic-ratelimit-tokens-reset": "2026-10-22T09:16:37Z",
+    "content-type": "application/json",
+    "request-id": "req_011CgH2JrVoYo8mgs39WMP3A"
+  },
+  "body": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011CgH2K2DCSA8HL6u4ocbcD",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"intent\":\"out_of_scope\",\"confidence\":0.9}"
+      }
+    ],
+    "container": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+      "input_tokens": 9,
+      "cache_creation_input_tokens": 4368,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 4368,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 22,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
+  }
+}

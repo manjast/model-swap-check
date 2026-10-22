@@ -142,6 +142,9 @@ class Sender:
     clock: Clock = field(default_factory=SystemClock)
     rng: random.Random = field(default_factory=random.Random)
     policy: RetryPolicy = field(default_factory=RetryPolicy)
+    # Called with every 2xx JSON response (status, headers, body) before parsing; the pilot saves real
+    # responses through it as T-R2 fixtures (spec §10).
+    capture: Callable[[int, httpx.Headers, Mapping[str, Any]], None] | None = None
 
     def backoff_s(self, attempt_number: int, retry_after: float | None) -> float:
         """Full jitter over the capped exponential; a longer `retry-after` wins."""
@@ -209,6 +212,7 @@ class Sender:
             latency = (self.clock.monotonic() - start) * 1000.0
             status = response.status_code
             request_id = self.adapter.request_id(response.headers)
+            kept = self.adapter.rate_limit_headers(response.headers)
             body: Any
             try:
                 body = response.json()
@@ -224,9 +228,12 @@ class Sender:
                             error="bad_body",
                             latency_ms=latency,
                             request_id=request_id,
+                            headers=kept,
                         )
                     )
                     return SendResult(attempts, None, "bad_body", response.text[:ERROR_BODY_CHARS])
+                if self.capture is not None:
+                    self.capture(status, response.headers, body)
                 parsed = parse(body)
                 record(
                     Attempt(
@@ -235,6 +242,7 @@ class Sender:
                         usage=parsed.usage,
                         latency_ms=latency,
                         request_id=request_id,
+                        headers=kept,
                     )
                 )
                 return SendResult(attempts, parsed, None, None)
@@ -249,6 +257,7 @@ class Sender:
                     error=error,
                     latency_ms=latency,
                     request_id=request_id,
+                    headers=kept,
                     retry_after_s=wait,
                 )
             )

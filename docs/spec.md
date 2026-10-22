@@ -255,7 +255,8 @@ Each LLM candidate is also scored at `τ_inc`: unweighted estimates and two-side
   - the §8 selection records (reasoning level per vendor, Jev design, D-X iteration and prompt hash);
   - slices and seeds;
   - the analysis code version;
-  - the budget plan: planned `cert` runs, drop order and NOT RUN decisions with reasons (§9.5).
+  - the budget plan: planned `cert` runs, drop order and NOT RUN decisions with reasons (§9.5);
+  - the pilot's option-order sensitivity per decision interface, as changed and total items (§14).
 - **Timing:** committed and tagged `contract-v1` before the first `cert` call.
 - **Changes:** any change after that is a new contract version with a written reason, never an edit.
 
@@ -327,7 +328,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 - **Limits file:** `config/limits.yaml` holds, per provider and model, request and token limits with an explicit unit (per minute or per second). Values are 80% of the account limits: OpenAI and Anthropic per minute, read from response headers in the pilot (`x-ratelimit-limit-*`, `anthropic-ratelimit-*`); TypeSafe per second, entered from its console because no header is documented.
 - **Enforcement:** a sliding-window limiter per provider in the limit's own unit: a request starts only if the requests and estimated tokens of the last window (60 s or 1 s), plus its own, stay within the limit. So no limit is exceeded in any window. 429 responses are counted per run.
-- **Latency:** monotonic wall-clock time of the final attempt, non-streamed, at concurrency 16, from this machine. Reported as p50/p95 overall and split by calls with and without cache reads. Provider timing headers are stored where available. Indicative only.
+- **Latency:** monotonic wall-clock time of the final attempt, non-streamed, at concurrency 16, from this machine. Reported as p50/p95 overall and split by calls with and without cache reads. Each attempt stores the response's rate-limit and timing headers (§10). Indicative only.
 
 ### 9.5 Budget and freeze guards
 
@@ -353,7 +354,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 ### `runs/<run_id>/items.jsonl.gz`, one row per item
 
 - **Row fields:** `item_id`, `status`, `error_code`, `stop_reason`, `raw_output` (LLMs: ≤ 2,000 chars of model text, or for an unbilled refusal the reported `stop_details` and usage; Jev and `luna-dec`: the full response JSON, uncapped; `api_error`: the error body, ≤ 2,000 chars), `intent`, `confidence`, `probabilities` (Jev and `luna-dec`, else null), `match_probability` (`jev-noul` only, else null), `case_normalized`, `latency_ms`, `request_id`, `model_id`.
-- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking). Jev usage maps to uncached input and output (output priced at $0). `luna-dec` usage maps like the Responses API; its output is priced at $0.
+- **`attempts`:** a list with usage per attempt (uncached input, cache read, cache write, output, reasoning/thinking) and the response's rate-limit and timing headers (e.g. `openai-processing-ms`). Jev usage maps to uncached input and output (output priced at $0). `luna-dec` usage maps like the Responses API; its output is priced at $0.
 - **Ground truth:** not stored; `decide` joins it from the split.
 
 ### `runs/manifest.yaml`
@@ -364,7 +365,7 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
 
 - **`config/prices.yaml`:** price per price key and token class, with source URL and retrieval date. The price key is the model ID, except for `luna-dec`, priced as `gpt-6-luna@decisions` ($0.10 per million input tokens; no output charge; any reported cached tokens are priced as input, since OpenAI states that no cache-read discount applies). Cost is always computed from it.
 - **`decisions/<decision_id>.md`** (generated):
-  - verdict and conditions;
+  - verdict and conditions; for D-J and D-O, the option-order sensitivity of the certified interface, stated as a limitation when more than 5% of choices changed (compared exactly);
   - gate table (estimate, Tango bound, Wald bound, margin, status) and family-adjusted status;
   - slice table;
   - naive-swap table;
@@ -381,20 +382,20 @@ Written by the runner (§9.5), never by hand: for each configuration and split u
   - steady traffic, with the shared prefix read from cache on every call;
   - sparse traffic, with nothing cached.
 
-**Planning estimate** (prefix ≈ 2,000 tokens; 300 reasoning tokens at `low`, 1,000 at `medium`; 90% cache hits):
+**Planning estimate** from the pilot's per-item p90 cost (`python analysis/pilot.py`; [`pilot.md`](pilot.md)), every planned run included, before any reasoning variant is certified:
 
 | Provider | Pilot + `dev` + `cert` without a reasoning variant | + `R` = `low` in `cert` | + `R` = `medium` in `cert` |
 |---|---|---|---|
-| OpenAI | ≈ $7.30 + D-O ≈ $3.10 = ≈ $10.40 (prefix 2,344 tokens) | + ≈ $1.90 | + ≈ $5.40 (does not fit the $15 cap; `low` substituted or dropped) |
-| Anthropic | ≈ $3.40 | + ≈ $2.15 | + ≈ $5.60 |
-| TypeSafe | ≈ $2.80 (input only, $0.042 per million tokens; both designs on `dev`) | — | — |
+| OpenAI | ≈ $9.05 (of which `luna-dec` ≈ $3.00) | + ≈ $0.70 | + ≈ $1.20 |
+| Anthropic | ≈ $1.95 | + ≈ $1.70 | + ≈ $1.90 |
+| TypeSafe | ≈ $3.10 (both designs on `dev`) | — | — |
 
-The pilot replaces the reasoning-token assumptions with measured values before any `dev` run.
+Every plan fits its cap − $0.50, `medium` included. Measured reasoning/thinking tokens per message (mean / p90): `luna-low` 8 / 42, `luna-medium` 73 / 168, `haiku55-low` 73 / 220, `haiku55-medium` 114 / 269, against the earlier assumption of 300 at `low` and 1,000 at `medium`.
 
 ## 12. Repository and workflow
 
 - **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The four APIs (OpenAI Responses and Decisions, Anthropic Messages, TypeSafe System One) are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
-- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run`, `decide` (`--runs-dir`, `--contract`, `--output-dir`; writes `decisions/*.md`, exits non-zero listing the problems when it refuses), `report` (`--pdisc-json PATH` for §7.3).
+- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run` (`--run-id`, `--retry-errors`, `--ceiling-usd`; `--capture-dir` also saves every 2xx response in the fixture format, used by the pilot), `decide` (`--runs-dir`, `--contract`, `--output-dir`; writes `decisions/*.md`, exits non-zero listing the problems when it refuses), `report` (`--pdisc-json PATH` for §7.3).
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
 
@@ -412,6 +413,8 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 | M7 publication | Stefan's review done; gitleaks over the full history clean; repository public |
 
 ## 14. Open items
+
+Answered by the M3 pilot on 2026-10-22, with evidence, in [`pilot.md`](pilot.md); the TypeSafe account limit still needs a reading from its console.
 
 | Item | Resolved at |
 |---|---|

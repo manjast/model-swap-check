@@ -172,6 +172,12 @@ def build_golden(root: Path) -> None:
                         "discordance": "Assumed 1% planning floor per slice, not estimated from dev.",
                     },
                 },
+                # jev-noul sits exactly on the 5% boundary (no limitation); luna-dec is above it.
+                "order_sensitivity": {
+                    "jev-c51": {"changed": 6, "items": 100},
+                    "jev-noul": {"changed": 5, "items": 100},
+                    "luna-dec": {"changed": 14, "items": 100},
+                },
             },
         }
     )

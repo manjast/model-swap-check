@@ -1,0 +1,197 @@
+{
+  "config_id": "luna-low",
+  "http_status": 200,
+  "headers": {
+    "openai-processing-ms": "1142",
+    "x-ratelimit-limit-requests": "5000",
+    "x-ratelimit-limit-tokens": "2000000",
+    "x-ratelimit-remaining-requests": "4999",
+    "x-ratelimit-remaining-tokens": "2000000",
+    "x-ratelimit-reset-requests": "12ms",
+    "x-ratelimit-reset-tokens": "0s",
+    "content-type": "application/json",
+    "x-request-id": "req_d3a712bf84eb4063adcaca0310b3ad1a"
+  },
+  "body": {
+    "id": "resp_03923d8d3cc4a17a016ad9d4a13d5887d2880be4603881c5ef",
+    "object": "response",
+    "created_at": 1792660641,
+    "status": "completed",
+    "access_programs": null,
+    "background": false,
+    "billing": {
+      "payer": "developer"
+    },
+    "completed_at": 1792660642,
+    "error": null,
+    "frequency_penalty": 0.0,
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "model": "gpt-6-luna",
+    "moderation": null,
+    "output": [
+      {
+        "id": "rs_03923d8d3cc4a17a016ad9d4a1b4f487d29ff3ab5e960e08ee",
+        "type": "reasoning",
+        "content": [],
+        "encrypted_content": "gAAAAABq2dSit3cBcyYtnE6dSYkN4JsIvZdqwmN-EbJKPDoWIJVRjuwL63LJjZZWXQY45B346ial0giHo4Jg8jo56LVqCDryIbUvOZiHYecDWIigNC8BJsQMbf5T7_lZ13crU9T0pK8dmZrtJno2n4IeKX68p4Qv8WDEZa4ApH6yW79cdR9QOu6_4b5O7ACkf0qapX7NJWeXxf5XSaL1fxWtu_nfkoFUGz6-_lPBxWKcNgF5AIncTDv4h4-BWIifpJRDbDU5rnUHyrlgpE3z4O8DCxmVrtkwDLb1RCswuT7Iz_KSfzC6l0P2kOXoEVmNIe-BKkW6A5iDwk_zlFVPxV_ZH29XRvXnxyGuZ2sQxo4LnQT6Hw4ldQRVU8kfkkMNfYLH4iQj0SLZHTWlWiRUXV4YL9RcteMAQhUyKdCBiJB4lo-epXElBXka4P3jixulk75Zc11xCh7igGGJwH7RTEgeQXOMTn5bIXjxw0RokO2w6ZDsxQA_leXwkRB80CW_zwYLmhbWwWmTQPjdRP2l7GRIaRCnaBFxf84mmAxp3nc6Wiw-As00leToylojdfJY8PlaXGUKU3Awm3IGNnMJzJBe1IxOBbg_clnSNQCIegyJfwy3TZx86hmhMXdzRSOjxUX1f_G-H0u00x_EepWAyWHMpaz6rht33yZ5zsL644ouDkKZfchFszjQYc9NIxpWQMMRMORA0f2VytSfgimIaaQV5IL59JRvu4xYQ7DTnJDiFpK8DxyPRkxbQNQxX_1cYzaWDwY6NK8CXzonyeBkGEFBtO4iT1l7zx8FuqqzhWNiSl7BkacxBDMKKZLpi0GFkjjBJ10ToSj8l2wwMp3qH-PsCI_EpbwVrT5x41pw_flsNLo26fSuSEPyNxQP0Okv5tFmdWynbynAkouQNckgOFGfpUJxMO5212xDLLYOF7fRbTJ1sfxXH0ry2GrSXEBff4I5lN7plMiFpRjE3xqnuFL0GLtZR4nYIbMPuO9aSY4EW7QGVOCjGlcJMTEXz2bXMmUT913MMyPgFuOebYfwH6I3Us2mHwWfZLuOAP5hJdT4T7DX62eiRpEmpusFZcRDlnXnN9zWH2sIpQ_EuKo-EmxZopmiEeqv-QcEPk6bx6dmSfy8kzv4u59ADZEMNbmu9oq6fr49PYKbdf1OeifFXv3l4dNitwynZFMbFJY2M1bJPSfUrk3InzT4qW0B1T9j9IuJsX2VOo5Py1RxItT2b_eHCJVoseR0j-sCFEnut-lwtYveCTrQMxg6EM3eVwvQqzXWbRf4__nkseatb-yegDOaD5BXwACv6F_XlyKnz1DjB_w500W4f3h5DgbmS-m13R8bd7xMOQceJlGMi_RzHXuL0FZ-7uSSrgjaRpd8rSrvCpMdsxyqRQTvKE-8ULfT8K_ExYjQ4_8eBNnHKSeh-b3LQ2n1L0qy4Abd7tWR0F1_GlqjsAWVb4cO9REn2Jl6Nyh7ial1mWHVGlVUcnn42lii4EygQiwd01nObplGsR0Zif6rWujbHHyklCMeyscBHnUoeYIpZ-FVaZ_R9h8wJIDEk4llE39EDTcB-o2Ofu2Znv4gky8Uw0Ed8OWRDRJCsQHp2xhkcnSZXFuvwlOfSGbXNHpRYS7HzQCFH--6A0_3jK-ONLndMwLIMPNfCko3gRAjYl5JSW5Wrmn0zOJl1z6hARVnDYkI7_gto59JG6KjG5xdYSJQ8MnsbEedzXrQAS2Ubxbwv_Ye1eGJYtWnqL8VsSi2OqFc2o5_GTAgTy8PrLamUs-wZwKAjX7kMX63pXqRadtgfX1z",
+        "summary": []
+      },
+      {
+        "id": "msg_03923d8d3cc4a17a016ad9d4a1f79087d28d692b18ebe1db20",
+        "type": "message",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "annotations": [],
+            "logprobs": [],
+            "text": "{\"intent\":\"fiat_currency_support\",\"confidence\":0.88}"
+          }
+        ],
+        "phase": "final_answer",
+        "role": "assistant"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0.0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "prompt_cache_options": {
+      "mode": "explicit",
+      "ttl": "30m"
+    },
+    "prompt_cache_retention": "24h",
+    "reasoning": {
+      "context": "all_turns",
+      "effort": "low",
+      "mode": "standard",
+      "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "default",
+    "store": false,
+    "temperature": 1.0,
+    "text": {
+      "format": {
+        "type": "json_schema",
+        "description": null,
+        "name": "routing",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "intent": {
+              "type": "string",
+              "enum": [
+                "activate_my_card",
+                "apple_pay_or_google_pay",
+                "automatic_top_up",
+                "balance_not_updated_after_bank_transfer",
+                "balance_not_updated_after_cheque_or_cash_deposit",
+                "beneficiary_not_allowed",
+                "cancel_transfer",
+                "card_about_to_expire",
+                "card_arrival",
+                "card_linking",
+                "card_payment_fee_charged",
+                "card_payment_not_recognised",
+                "card_payment_wrong_exchange_rate",
+                "cash_withdrawal_charge",
+                "cash_withdrawal_not_recognised",
+                "change_pin",
+                "country_support",
+                "declined_card_payment",
+                "declined_cash_withdrawal",
+                "declined_transfer",
+                "direct_debit_payment_not_recognised",
+                "disposable_card_limits",
+                "edit_personal_details",
+                "exchange_charge",
+                "exchange_via_app",
+                "extra_charge_on_statement",
+                "failed_transfer",
+                "fiat_currency_support",
+                "getting_spare_card",
+                "lost_or_stolen_phone",
+                "order_physical_card",
+                "pending_card_payment",
+                "pending_cash_withdrawal",
+                "pending_top_up",
+                "pending_transfer",
+                "Refund_not_showing_up",
+                "request_refund",
+                "reverted_card_payment?",
+                "supported_cards_and_currencies",
+                "top_up_failed",
+                "top_up_reverted",
+                "transaction_charged_twice",
+                "transfer_fee_charged",
+                "transfer_not_received_by_recipient",
+                "transfer_timing",
+                "verify_top_up",
+                "visa_or_mastercard",
+                "why_verify_identity",
+                "wrong_amount_of_cash_received",
+                "wrong_exchange_rate_for_cash_withdrawal",
+                "out_of_scope"
+              ]
+            },
+            "confidence": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "intent",
+            "confidence"
+          ],
+          "additionalProperties": false
+        },
+        "strict": true
+      },
+      "verbosity": "medium"
+    },
+    "tool_choice": "auto",
+    "tool_usage": {
+      "image_gen": {
+        "input_tokens": 0,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 0
+        },
+        "total_tokens": 0
+      },
+      "web_search": {
+        "num_requests": 0
+      }
+    },
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 0.98,
+    "truncation": "disabled",
+    "usage": {
+      "input_tokens": 2661,
+      "input_tokens_details": {
+        "cache_write_tokens": 0,
+        "cache_write_tokens_details": {
+          "ttl_12h_tokens": 0,
+          "ttl_30m_tokens": 0
+        },
+        "cached_tokens": 2648
+      },
+      "output_tokens": 49,
+      "output_tokens_details": {
+        "reasoning_tokens": 26
+      },
+      "total_tokens": 2710
+    },
+    "user": null,
+    "metadata": {}
+  }
+}
