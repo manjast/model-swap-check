@@ -47,6 +47,7 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-V1 | Verdict table on constructed gate results: SHIP, BLOCK, INCONCLUSIVE (with sample sizes), NOT RUN with both reasons (short record, no gate table), the D-X conditions, the family-adjusted column (1 − 0.05/7), the A/A downgrade, the G2 composite rules (one slice FAIL vs some UNRESOLVED), `τ_c` = 1.01 → G3 FAIL → BLOCK, the naive-swap sections of D-J and D-O reading "not applicable", and their option-order line with the limitation above 5% only (5/100 is not one) | §7.1, §7.2, §7.5, §14 |
 | T-V2 | Byte-identical decision record from the same inputs and seeds; no wall-clock fields; values rounded to 0.01 pp | §7.4 |
 | T-V3 | COST and LATENCY flags appear at the stated ratios and never change the verdict; decision records list reasoning/thinking tokens per message (mean, p95) for every configuration | §7.2, §10 |
+| T-V4 | Policy analysis (amendment 1): on constructed runs, each configuration's `τ_2%` is the smallest supported τ with its own weighted `dev` W ≤ 2% (1.01 when none); the `cert` section reports W and A at `τ_2%` with hand-checked Wilson intervals and the paired A difference against the incumbent with its Tango bounds; the G3 limitation line appears exactly when the incumbent's `dev` A at `τ_inc` is below 3.0 pp; verdicts are identical with and without the section | §7.8 |
 
 ## 4. Providers, runner, guards (M1)
 
