@@ -1,0 +1,45 @@
+{
+  "run_id": "jev-noul-cert-20261022T152203Z",
+  "config_id": "jev-noul",
+  "config_sha256": "e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b",
+  "split": "cert",
+  "item_list_sha256": "5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "50ad902ab1ddb39bdc5242b5009f0e0d61985699a41669bd4a1b8d05c2551da8",
+  "requested_model": "jev-1.13.0",
+  "returned_model_ids": [
+    "jev-1.13.0"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "3ee1db7f29902d7217e7716577ab7f7486a7b50f",
+  "contract_tag_commit": "3ee1db7f29902d7217e7716577ab7f7486a7b50f",
+  "warmups": [],
+  "started_at": "2026-10-22T15:22:03Z",
+  "ended_at": "2026-10-22T15:37:14Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 9758,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 46678467,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 5557313,
+      "reasoning": null
+    },
+    "billed_usd": 1.960495614,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}
