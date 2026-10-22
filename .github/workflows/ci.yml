@@ -32,6 +32,10 @@ jobs:
         run: uv run --no-sync swapcheck prompt --check
       - name: Tests
         run: uv run --no-sync pytest
+      - name: Replay decision records from the committed runs
+        run: |
+          uv run --no-sync swapcheck decide --output-dir "$RUNNER_TEMP/decisions"
+          diff -r decisions "$RUNNER_TEMP/decisions"
       - name: Install gitleaks
         run: |
           curl -sSL -o /tmp/gitleaks.tgz \

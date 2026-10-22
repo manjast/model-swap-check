@@ -1,0 +1,45 @@
+{
+  "run_id": "luna-dec-cert-20261022T134855Z",
+  "config_id": "luna-dec",
+  "config_sha256": "7d35f91149329f4aa8ec042c60140722318d9d7d4f37ac944aab1cd3695f73ad",
+  "split": "cert",
+  "item_list_sha256": "5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "97ff4d951a4a3c1bc8bd387b908c2ba5520f6f579aa87859eb6bb12c3c8e501e",
+  "requested_model": "gpt-6-luna",
+  "returned_model_ids": [
+    "gpt-6-luna"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "8e10a4c8a74335c12dcb023ba5cbff039896dab8",
+  "contract_tag_commit": "8e10a4c8a74335c12dcb023ba5cbff039896dab8",
+  "warmups": [],
+  "started_at": "2026-10-22T13:48:55Z",
+  "ended_at": "2026-10-22T14:05:31Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 9758,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 22631714,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 0,
+      "reasoning": 0
+    },
+    "billed_usd": 2.2631714,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}

@@ -9,7 +9,7 @@ Your LLM classifier has to move. OpenAI removes `gpt-4o-mini` from its API on 20
 
 Every model is scored against ground-truth labels on the same messages. Reasoning effort and request design are selected on development data. Acceptance rules are frozen before the test runs, and every decision can be replayed from the recorded responses.
 
-**Status:** M4 done: all 13 development runs are in, the incumbent passed its competence check and the acceptance contract is frozen in `contracts/contract-v1.yaml`. The incumbent's stated confidence turned out to support the registered 2% risk limit only at 1.83% automation, so spec amendment 1 added a descriptive analysis at that limit before any candidate was run. No test-set (`cert`) run yet.
+**Status:** M5 done: the seven planned test-set (`cert` and `aa`) runs are in, and the decision records are in [`decisions/`](decisions/) ([summary](docs/cert.md)). All five run decisions are SHIP. The automation gate (G3) could not fail, because the incumbent automates only 2% at its threshold (spec amendment 1); the error-rate and validity gates were live and passed. The descriptive analysis at the 2% risk limit shows every LLM candidate automating 25–43% of traffic within that limit. Write-up (M6) next.
 
 - [Specification](docs/spec.md)
 - [Test plan](docs/test-plan.md)
