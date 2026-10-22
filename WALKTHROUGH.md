@@ -20,15 +20,15 @@ A reading path through the repository, then the design questions a reviewer is l
    - [`freeze.py`](src/swapcheck/freeze.py) and [`manifest.py`](src/swapcheck/manifest.py): a test run starts only on the frozen code, once per configuration;
    - [`outcomes.py`](src/swapcheck/outcomes.py), [`calibrate.py`](src/swapcheck/calibrate.py), [`stats.py`](src/swapcheck/stats.py) and [`decide.py`](src/swapcheck/decide.py): routing outcomes, thresholds, paired bounds and the decision records;
    - [`jev_policy.py`](src/swapcheck/jev_policy.py) and [`risk_limits.py`](src/swapcheck/risk_limits.py): amendments 2 and 3.
-6. **[Test plan](docs/test-plan.md)**: every test ID maps to a spec section; [`tests/test_golden.py`](tests/test_golden.py) replays a small fixed run set into decision records.
+6. **[Test plan](docs/test-plan.md)**: every test ID maps to a spec section; [`tests/test_golden.py`](tests/test_golden.py) replays committed synthetic runs into decision records byte for byte, offline.
 
 ## Questions and answers
-6. **[Test plan](docs/test-plan.md)**: every test ID maps to a spec section; [`tests/test_golden.py`](tests/test_golden.py) replays committed synthetic runs into decision records byte for byte, offline.
+
 **Why W and A instead of accuracy?**
 A router's risk is a wrong automatic route, and its value is the work it takes off people. Accuracy mixes the two and ignores the threshold. Top-1 accuracy is still reported as a diagnostic (spec §5).
 
 **Why does each model get its own threshold?**
-Confidence values are not comparable between models. Keeping the incumbent's threshold of 0.95 and changing only the model ID to Luna took W from 0.00% to 3.91% on the test set. Each decision record shows this naive swap next to the fitted comparison (spec §7.5).
+Confidence values are not comparable between models. Keeping the incumbent's threshold of 0.95 and changing only the model ID to Luna took W from 0.00% to 3.91% on the test set. Each LLM decision record shows this naive swap next to the fitted comparison (spec §7.5).
 
 **Why freeze the rules before the test run?**
 With five candidates, several thresholds and seven slices, there are enough choices to make almost any candidate look good after the fact. The specification, the margins and the thresholds are fixed first; the contract is tagged in git; the runner refuses a test run whose code or inputs differ from the tagged commit and refuses a second test run of the same configuration under that tag (spec §7.7, §9.5).
