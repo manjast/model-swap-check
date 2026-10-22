@@ -42,7 +42,7 @@ from swapcheck.contract import (
     load_contract,
 )
 from swapcheck.contract import Calibration as FrozenCalibration
-from swapcheck.freeze import CONTRACT_TAG, head_commit
+from swapcheck.freeze import CONTRACT_TAG
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, IntentGroups, load_groups
 from swapcheck.outcomes import AnalysisRun, build_run, dev_weights, weighted_rates
 from swapcheck.records import ItemRow, RunMeta, read_meta, read_rows
@@ -308,6 +308,18 @@ def frozen_configurations(configs: dict[str, Configuration]) -> dict[str, Contra
     return out
 
 
+def code_version() -> str:
+    """Git tree hashes of the analysis code. Unlike a commit hash, they survive the squash merge of the M4 branch
+    and can be checked against any later commit with `git rev-parse <commit>:src`."""
+    trees = [
+        subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{path}"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        for path in ("src", "analysis")
+    ]
+    return f"src tree {trees[0]}, analysis tree {trees[1]}"
+
+
 def clean_code(paths: Sequence[str]) -> None:
     result = subprocess.run(
         ["git", "-C", str(REPO_ROOT), "status", "--porcelain", "--", *paths], capture_output=True, text=True, check=True
@@ -455,7 +467,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         power={},
         slices=inputs.groups.slices,
         seeds={"bootstrap": SEED, "reasoning": SEED, "power": SEED},
-        code_version=head_commit(REPO_ROOT),
+        code_version=code_version(),
         budget=BudgetPlan(
             planned_cert_runs=["aa" if r.split == "aa" else r.config_id for r in plan.runs],
             drop_order=list(budget_mod.CERT_DROP_ORDER),
