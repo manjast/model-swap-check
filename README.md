@@ -15,6 +15,7 @@ Every model is scored against ground-truth labels on the same messages. Reasonin
 - [Test plan](docs/test-plan.md)
 - [Pilot results](docs/pilot.md), reproduced by `python analysis/pilot.py`
 - [Development runs and contract freeze](docs/dev.md), reproduced by `python analysis/dev.py freeze`
+- [Test-set runs and decisions](docs/cert.md); cost and speed reproduced by `python analysis/cert_speed.py`
 - [Power analysis](analysis/power.py): how often the acceptance rules certify an equally good candidate
 - [Incumbent prompt](prompts/incumbent-v1.md), its [Jev translation](prompts/jev-v1.yaml) and its [Decisions API translation](prompts/decisions-v1.yaml)
 
