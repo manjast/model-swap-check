@@ -414,7 +414,7 @@ Every plan fits its cap − $0.50, `medium` included. Measured reasoning/thinkin
 
 ## 14. Open items
 
-Answered by the M3 pilot on 2026-10-22, with evidence, in [`pilot.md`](pilot.md); the TypeSafe account limit still needs a reading from its console.
+Answered by the M3 pilot on 2026-10-22, with evidence, in [`pilot.md`](pilot.md); the TypeSafe account limit was read from its console.
 
 | Item | Resolved at |
 |---|---|
