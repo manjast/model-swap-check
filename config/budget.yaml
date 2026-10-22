@@ -4,6 +4,6 @@
 caps_usd:
   openai: 15.0
   anthropic: 10.0
-  typesafe: 5.0
+  typesafe: 6.0  # raised from 5.0 by amendment 2 (spec §7.9)
 
 reserve_margin_usd: 0.50
