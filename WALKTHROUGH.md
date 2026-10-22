@@ -37,7 +37,7 @@ With five candidates, several thresholds and seven slices, there are enough choi
 It stays, and its limitation is written into every decision record. The automation gate compared candidates with the incumbent's 2.05% and could not fail; this was seen after the incumbent's development run. New analyses were added as declared amendments: the text is committed before the numbers it reports are computed, and each has its own tagged contract and CI replay. Amendment 2 failed on the test set (W 2.03% against a 2% limit) and is published as it came out.
 
 **Which statistics, and why?**
-Gates compare candidate and incumbent on the same messages, so the bounds are one-sided Tango score bounds for paired proportions. They were chosen by simulation at the planned slice sizes, where a percentile bootstrap and the normal approximation released an at-margin candidate too often (spec §7.1). Single proportions in the descriptive analyses use Wilson score intervals. Slice gates use a Bonferroni correction over seven slices; an intent-cluster bootstrap is reported as a sensitivity check.
+Gates compare candidate and incumbent on the same messages, so the bounds are one-sided Tango score bounds for paired proportions. They were chosen by simulation at the planned slice sizes, where a percentile bootstrap and the normal approximation released an at-margin candidate too often (spec §7.1). Single proportions in the descriptive analyses use Wilson score intervals. The slice gate passes only if every slice passes its one-sided 95% upper bound; only its FAIL side uses a Bonferroni correction over seven slices. An intent-cluster bootstrap is reported as a sensitivity check.
 
 **How big is run-to-run noise?**
 The incumbent ran twice on 3,080 test messages. 0.29 pp of routing outcomes flipped, and the repeat passed the error-rate gates against the first run (spec §7.6).
@@ -46,7 +46,7 @@ The incumbent ran twice on 3,080 test messages. 0.29 pp of routing outcomes flip
 One retry policy for every provider (the SDKs retry on their own), request bodies that tests can snapshot exactly, and the raw response JSON in the records (spec §12).
 
 **How is spending kept under the cap?**
-Every HTTP attempt, retries and warm-ups included, must be admitted before it starts: spent so far, plus reservations of attempts in flight, plus its own worst-case cost must stay under the provider's cap minus $0.50. Spend is computed from the run records themselves, so an interrupted run is never undercounted (spec §9.5).
+Every HTTP attempt, retries and warm-ups included, must be admitted before it starts: spent so far, plus reservations of attempts in flight, plus its own worst-case cost must stay under the provider's cap minus $0.50. Spend is computed from the persisted item and warm-up records, retries included, so a later run sees what earlier runs cost; a hard kill can still lose the charges of the requests in flight at that moment (spec §9.5).
 
 **Can I trust the decision records were not edited by hand?**
 CI regenerates every record from the recorded responses and fails if one byte differs. The replay commands are in the README; they need no API key.
