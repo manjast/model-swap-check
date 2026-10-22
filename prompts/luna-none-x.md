@@ -1,6 +1,6 @@
-# D-X iteration 1 (luna-none)
+# D-X iteration 3 (luna-none)
 
-Written on 2026-10-22 from the incumbent prompt and the `luna-none` `dev` error counts by true and routed intent, with no message text read (spec §2.5, §8.3). Only the instructions and descriptions change; the catalog and its examples are the incumbent's. `swapcheck.prompt` parses this file; the text sent to the model is rendered from the sections below.
+Written on 2026-10-22 from iteration 2 and the error counts of its `dev` run by true and routed intent and by confidence, with no message text read (spec §2.5, §8.3). Iteration 2 stated 1 on 584 items, 6 of them wrong, all reports of something that did not arrive, failed or was declined. This last iteration keeps iteration 2 and withholds 1 from such reports. The catalog and its examples are the incumbent's.
 
 ## routing_instruction
 
@@ -12,7 +12,7 @@ If none of the listed intents fits the message, including when it is about a rel
 
 ## output_clause
 
-Answer with JSON only. "intent" is the chosen intent exactly as written in the list, or out_of_scope. "confidence" is your probability, from 0 to 1, that the chosen intent is correct. Give 0.99 or more only when the message matches the description exactly and could not be about another listed intent or an unlisted topic; otherwise give a lower value.
+Answer with JSON only. "intent" is the chosen intent exactly as written in the list, or out_of_scope. "confidence" is your probability, from 0 to 1, that the chosen intent is correct. Give 1 when the message can only mean the chosen intent; give 0.99 or 0.98 when it clearly fits but another listed intent or an unlisted topic is conceivable; give lower values as the doubt grows. Never give 1 when the customer reports a payment, transfer, top-up or card that did not arrive, failed, was declined or does not work, because such reports often fit several intents.
 
 ## catalog
 
@@ -33,7 +33,7 @@ Answer with JSON only. "intent" is the chosen intent exactly as written in the l
 
 ### balance_not_updated_after_bank_transfer
 
-- description: Money sent into the account by bank transfer has not appeared in the balance yet.
+- description: Money the customer sent into their own account by bank transfer has not appeared in the balance yet.
 - example: I've transferred money into my account but the balance is the same
 
 ### balance_not_updated_after_cheque_or_cash_deposit
@@ -43,7 +43,7 @@ Answer with JSON only. "intent" is the chosen intent exactly as written in the l
 
 ### beneficiary_not_allowed
 
-- description: The customer cannot add or pay a particular beneficiary, or a payment to one was refused as not allowed.
+- description: The customer cannot add a particular beneficiary or send money to them because it is not allowed, as opposed to a transfer that failed for another reason.
 - example: Why can't I use this beneficiary?
 
 ### cancel_transfer
@@ -138,7 +138,7 @@ Answer with JSON only. "intent" is the chosen intent exactly as written in the l
 
 ### exchange_via_app
 
-- description: How to exchange one currency for another in the app. Not for questions about the rate that is used.
+- description: How to exchange one currency for another in the app. Not for what rate is applied or how rates are set.
 - example: I would like to change to a different currency.
 
 ### extra_charge_on_statement
