@@ -74,7 +74,7 @@ class FakeAdapter:
     def warmup_cache_keys(self, cfg: Configuration) -> list[str | None]:
         if cfg.prompt_cache_keys:
             return [f"k{i}" for i in range(cfg.prompt_cache_keys)]
-        return [None] if cfg.is_llm else []
+        return [] if cfg.is_decision_interface else [None]
 
     def build_request(self, cfg: Configuration, prompt: Prompt, text: str, cache_key: str | None) -> HttpRequest:
         return HttpRequest(
@@ -86,7 +86,7 @@ class FakeAdapter:
 
     def parse_response(self, cfg: Configuration, prompt: Prompt, body: Mapping[str, Any]) -> Parsed:
         usage = Usage(**body["usage"])
-        raw = body["output"] if cfg.is_llm else json.dumps(body)
+        raw = json.dumps(body) if cfg.is_decision_interface else body["output"]
         return Parsed(
             status=body.get("status", "ok"),
             raw_output=raw,

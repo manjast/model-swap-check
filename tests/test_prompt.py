@@ -1,4 +1,4 @@
-"""T-D5 to T-D7: prompt definition, leakage and the Jev translation (spec §2.5, §3.1, §4.1)."""
+"""T-D5 to T-D8: prompt definition, leakage, the Jev and the Decisions translations (spec §2.5, §3.1, §4.1, §4.2)."""
 
 from __future__ import annotations
 
@@ -29,7 +29,8 @@ def test_d5_catalog_and_enum_order(incumbent: Prompt, groups: IntentGroups) -> N
 
 def test_d5_no_out_of_scope_names(incumbent: Prompt, groups: IntentGroups) -> None:
     file_text = prompt.INCUMBENT_PROMPT.read_text(encoding="utf-8")
-    for text in (file_text, incumbent.developer_message(), prompt.JEV_PROMPT.read_text("utf-8")):
+    translations = (prompt.JEV_PROMPT.read_text("utf-8"), prompt.DECISIONS_PROMPT.read_text("utf-8"))
+    for text in (file_text, incumbent.developer_message(), *translations):
         assert oos_token_hits(text, groups) == []
     # The matcher must not fire inside a longer in-scope name.
     assert oos_token_hits("card_payment_wrong_exchange_rate", groups) == []
@@ -101,5 +102,25 @@ def test_d7_jev_translation_reproduces_the_committed_file(incumbent: Prompt) -> 
     assert designs["jev-noul"]["noul"]["instructions"] == {
         "question": "Does the customer message ask about any of the topics in catalog?",
         "catalog": {e.intent: e.description for e in incumbent.catalog},
+    }
+    assert incumbent.output_clause not in committed
+
+
+def test_d8_decisions_translation_reproduces_the_committed_file(incumbent: Prompt) -> None:
+    committed = prompt.DECISIONS_PROMPT.read_text(encoding="utf-8")
+    assert prompt.render_decisions_yaml(incumbent) == committed
+
+    designs = yaml.safe_load(committed)
+    assert list(designs) == ["luna-dec"]
+    (question,) = designs["luna-dec"]["questions"]
+    assert list(question) == ["type", "name", "instructions", "choices"]
+    assert (question["type"], question["name"]) == ("choice", "intent")
+    assert question["instructions"] == f"{incumbent.routing_instruction} {incumbent.oos_clause}"
+    assert [c["value"] for c in question["choices"]] == [*incumbent.intents, OUT_OF_SCOPE]
+    for entry, choice in zip(incumbent.catalog, question["choices"], strict=False):
+        assert choice["description"] == f"{entry.description} Example: {entry.example}"
+    assert question["choices"][-1] == {
+        "value": OUT_OF_SCOPE,
+        "description": "The customer message is about none of the other options.",
     }
     assert incumbent.output_clause not in committed

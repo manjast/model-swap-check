@@ -52,11 +52,12 @@ class Prices(BaseModel):
     retrieved: str
     models: dict[str, ModelPrice]
 
-    def for_model(self, model: str) -> ModelPrice:
+    def for_config(self, cfg: Configuration) -> ModelPrice:
+        """The price of `cfg.price_key` (the model ID, or `<model>@decisions` for `luna-dec`; spec §10)."""
         try:
-            return self.models[model]
+            return self.models[cfg.price_key]
         except KeyError:
-            raise KeyError(f"no price for model {model!r} in config/prices.yaml") from None
+            raise KeyError(f"no price for {cfg.price_key!r} ({cfg.id}) in config/prices.yaml") from None
 
 
 def load_prices(path: Path = PRICES_PATH) -> Prices:
@@ -77,7 +78,7 @@ def _usage_cost(
 
 def attempt_cost_usd(prices: Prices, cfg: Configuration, usage: Usage) -> float:
     """Cost of one attempt's usage. `usage.reasoning` is a subset of `usage.output`, so it adds nothing."""
-    price = prices.for_model(cfg.model)
+    price = prices.for_config(cfg)
     return _usage_cost(price, usage.uncached_input, usage.cache_read, usage.cache_write, usage.output)
 
 
@@ -88,7 +89,7 @@ def reservation_usd(prices: Prices, cfg: Configuration, usage: Usage) -> float:
     input rate, since a cache-missing request that writes its prefix pays the cache-write rate where that
     exceeds the uncached one, plus its output allowance at the output rate.
     """
-    price = prices.for_model(cfg.model)
+    price = prices.for_config(cfg)
     input_tokens = usage.uncached_input + usage.cache_read + usage.cache_write
     input_rate = max(price.uncached_input, price.cache_read, price.cache_write)
     return _PER_TOKEN * (input_tokens * input_rate + usage.output * price.output)
@@ -113,10 +114,11 @@ def input_token_estimate(cfg: Configuration, prompt: Prompt, text: str) -> int:
     """Conservative full input of one request for `text`, in the provider's billed tokens.
 
     Counted on the body the adapter actually sends (developer/system message, user text, JSON schema;
-    for Jev the state and every question, including the Noul object), serialized as JSON, in
-    `o200k_base` tokens, times `INPUT_SAFETY_FACTOR[cfg.provider]`, rounded up.
+    for Jev the state and every question, including the Noul object; for `luna-dec` the input and the
+    choice question), serialized as JSON, in `o200k_base` tokens, times `INPUT_SAFETY_FACTOR[cfg.provider]`,
+    rounded up.
     """
-    body = get_adapter(cfg.provider).build_request(cfg, prompt, text, None).body
+    body = get_adapter(cfg).build_request(cfg, prompt, text, None).body
     n = len(_o200k().encode(json.dumps(body, ensure_ascii=False)))
     return math.ceil(n * INPUT_SAFETY_FACTOR[cfg.provider])
 
@@ -124,10 +126,11 @@ def input_token_estimate(cfg: Configuration, prompt: Prompt, text: str) -> int:
 def timeout_usage(cfg: Configuration, prompt: Prompt, text: str) -> Usage:
     """The charge for a timed-out attempt (spec §9.5): full uncached input plus max output tokens.
 
-    Input is `input_token_estimate`. Jev output is priced at $0 (§10), so only input is charged.
+    Input is `input_token_estimate`. Decision-interface output (Jev, `luna-dec`) is priced at $0 (§10) and
+    has no token limit, so only input is charged.
     """
     uncached = input_token_estimate(cfg, prompt, text)
-    if not cfg.is_llm:
+    if cfg.is_decision_interface:
         return Usage(uncached_input=uncached, output=0)
     if cfg.max_output_tokens is None:
         raise ValueError(f"configuration {cfg.id} has no max_output_tokens")
@@ -223,7 +226,7 @@ def cost_model(cfg: Configuration, rows: Sequence[ItemRow], warmups: Sequence[Wa
     """
     if not rows:
         raise ValueError(f"no item rows for {cfg.id}")
-    price = prices.for_model(cfg.model)
+    price = prices.for_config(cfg)
     per_item: dict[str, list[float]] = {c: [] for c in TOKEN_CLASSES}
     item_costs: list[float] = []
     for row in rows:

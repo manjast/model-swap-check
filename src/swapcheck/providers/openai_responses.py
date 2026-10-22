@@ -78,7 +78,7 @@ class OpenAIResponsesAdapter:
         return HttpRequest("POST", URL, {"content-type": "application/json"}, body)
 
     def parse_response(self, cfg: Configuration, prompt: Prompt, body: Mapping[str, Any]) -> Parsed:
-        usage = _usage(body.get("usage") or {})
+        usage = openai_usage(body.get("usage") or {})
         model_id = body.get("model")
         status = body.get("status")
         incomplete_reason = (body.get("incomplete_details") or {}).get("reason")
@@ -103,13 +103,15 @@ class OpenAIResponsesAdapter:
         return select_headers(headers, ("x-ratelimit-",), RATE_LIMIT_NAMES)
 
 
-def _usage(raw: Mapping[str, Any]) -> Usage:
+def openai_usage(raw: Mapping[str, Any]) -> Usage:
+    """OpenAI usage (Responses and Decisions): `input_tokens` includes cached and cache-written tokens."""
     details = raw.get("input_tokens_details") or {}
     cache_read = details.get("cached_tokens") or 0
     cache_write = details.get("cache_write_tokens") or 0
     reasoning = (raw.get("output_tokens_details") or {}).get("reasoning_tokens")
     return Usage(
-        uncached_input=(raw.get("input_tokens") or 0) - cache_read - cache_write,
+        # Clamped: inconsistent counters must never lower the charge below the reported cache classes.
+        uncached_input=max(0, (raw.get("input_tokens") or 0) - cache_read - cache_write),
         cache_read=cache_read,
         cache_write=cache_write,
         output=raw.get("output_tokens") or 0,

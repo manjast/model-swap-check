@@ -141,7 +141,7 @@ def test_r4_rate_limit_never_exceeded_in_any_window(
     )
     worst_requests, worst_tokens = max_in_any_window(starts, limit.window_s)
     assert worst_requests <= limit.requests and worst_tokens <= limit.tokens
-    assert len(starts) == 30 + (1 if CONFIGS[config_id].is_llm else 0)
+    assert len(starts) == 30 + (0 if CONFIGS[config_id].is_decision_interface else 1)
 
 
 # --- T-R3: final failure → api_error, every attempt kept --------------------------------------------

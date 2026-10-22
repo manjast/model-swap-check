@@ -78,6 +78,7 @@ DEV_PLAN: tuple[PlannedRun, ...] = (
     PlannedRun("inc", "inc", "dev"),
     PlannedRun("jev-c51", "jev-c51", "dev"),
     PlannedRun("jev-noul", "jev-noul", "dev"),
+    PlannedRun("luna-dec", "luna-dec", "dev"),
     PlannedRun("luna-none", "luna-none", "dev"),
     PlannedRun("haiku55-off", "haiku55-off", "dev"),
     PlannedRun("luna-low", "luna-low", "dev"),
@@ -180,8 +181,9 @@ RUN_DECISION: dict[str, str] = {
     "haiku55-R": "D-B2",
     "jev-D": "D-J",
     "luna-none-x": "D-X",
+    "luna-dec": "D-O",
 }
-CERT_DROP_ORDER: tuple[str, ...] = ("luna-R", "haiku55-R", "luna-none-x", "aa")
+CERT_DROP_ORDER: tuple[str, ...] = ("luna-R", "haiku55-R", "luna-none-x", "luna-dec", "aa")
 _VENDOR_PREFIX: dict[str, str] = {"openai": "luna", "anthropic": "haiku55"}
 NOISE_FLOOR_WARNING = "aa not run: noise floor not measured"
 
@@ -223,6 +225,7 @@ def cert_plan(outcomes: Mapping[Vendor, ReasoningOutcome], jev_design: str) -> C
         PlannedRun("inc", "inc", "cert"),
         PlannedRun("luna-none", "luna-none", "cert"),
         PlannedRun("aa", "inc", "aa"),
+        PlannedRun("luna-dec", "luna-dec", "cert"),
         PlannedRun("luna-none-x", "luna-none-x", "cert"),
     ]
     reasoning_run("openai")
@@ -259,7 +262,7 @@ def freeze_projection(
     budget: BudgetConfig,
 ) -> FreezePlan:
     """Spec §9.5 projection before the freeze, per provider: substitute `medium` -> `low` when `low` in E,
-    then drop `luna-R`, `haiku55-R`, `luna-none-x`, `aa` until spent + plan ≤ cap - margin.
+    then drop `luna-R`, `haiku55-R`, `luna-none-x`, `luna-dec`, `aa` until spent + plan ≤ cap - margin.
 
     `dev_p90` is per-item p90 cost from each configuration's `dev` run (`luna-none-x`: the selected
     iteration). If a provider still does not fit, none of its runs start; without `inc` no decision

@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+from fakes import FakeClock
 
 from swapcheck.configs import Configuration, load_configurations
 from swapcheck.cost import attempt_cost_usd, load_prices
 from swapcheck.groups import OUT_OF_SCOPE
+from swapcheck.http import Sender, SendResult
 from swapcheck.parse import RAW_OUTPUT_CAP
 from swapcheck.prompt import Prompt
 from swapcheck.providers import get_adapter
 from swapcheck.providers.anthropic_messages import ANTHROPIC_VERSION
 from swapcheck.records import Parsed, Usage
-from swapcheck.schema import llm_output_schema
+from swapcheck.schema import llm_output_schema, schema_sha256
 
 FIXTURES = Path(__file__).parent / "fixtures" / "responses"
 CONFIGS = load_configurations()
@@ -28,7 +31,7 @@ FAKE_KEY = "sk-test-NOT-A-REAL-KEY-0123456789"
 
 def _request(cid: str, prompt: Prompt, cache_key: str | None = None) -> dict[str, Any]:
     cfg = CONFIGS[cid]
-    request = get_adapter(cfg.provider).build_request(cfg, prompt, RAW_TEXT, cache_key)
+    request = get_adapter(cfg).build_request(cfg, prompt, RAW_TEXT, cache_key)
     assert request.method == "POST"
     return request.body
 
@@ -91,9 +94,12 @@ JEV_EXPECTED: dict[str, tuple[str, bool]] = {  # design, reversed
     "jev-noul-reversed": ("noul", True),
 }
 
+DECISIONS_EXPECTED: dict[str, bool] = {"luna-dec": False, "luna-dec-reversed": True}  # reversed
+
 
 def test_r1_every_snapshot_configuration_has_an_expectation() -> None:
-    assert set(SNAPSHOT_IDS) == set(OPENAI_EXPECTED) | set(ANTHROPIC_EXPECTED) | set(JEV_EXPECTED)
+    expected = set(OPENAI_EXPECTED) | set(ANTHROPIC_EXPECTED) | set(JEV_EXPECTED) | set(DECISIONS_EXPECTED)
+    assert set(SNAPSHOT_IDS) == expected
 
 
 @pytest.mark.parametrize("cid", sorted(OPENAI_EXPECTED))
@@ -124,7 +130,7 @@ def test_r1_openai_request(incumbent: Prompt, cid: str) -> None:
 def test_r1_anthropic_request(incumbent: Prompt, cid: str) -> None:
     exp = ANTHROPIC_EXPECTED[cid]
     cfg = CONFIGS[cid]
-    request = get_adapter("anthropic").build_request(cfg, incumbent, RAW_TEXT, None)
+    request = get_adapter(cfg).build_request(cfg, incumbent, RAW_TEXT, None)
     body = request.body
     # No top-level cache_control and no sampling parameters (temperature/top_p/top_k are rejected by Haiku 5.5).
     assert set(body) == {"model", "max_tokens", "system", "messages", "thinking", "output_config"}
@@ -146,9 +152,9 @@ def test_r1_identical_schema_object_across_llms(incumbent: Prompt) -> None:
     schemas = []
     for cid in SNAPSHOT_IDS:
         body = _request(cid, incumbent)
-        if CONFIGS[cid].provider == "openai":
+        if cid in OPENAI_EXPECTED:
             schemas.append(body["text"]["format"]["schema"])
-        elif CONFIGS[cid].provider == "anthropic":
+        elif cid in ANTHROPIC_EXPECTED:
             schemas.append(body["output_config"]["format"]["schema"])
     assert len(schemas) == len(OPENAI_EXPECTED) + len(ANTHROPIC_EXPECTED)
     assert all(s == schemas[0] for s in schemas)
@@ -190,8 +196,42 @@ def test_r1_jev_request(incumbent: Prompt, cid: str) -> None:
         assert choice["criteria"][k] == {"description": entries[k].description, "example": entries[k].example}
 
 
+@pytest.mark.parametrize("cid", sorted(DECISIONS_EXPECTED))
+def test_r1_decisions_request(incumbent: Prompt, cid: str) -> None:
+    cfg = CONFIGS[cid]
+    request = get_adapter(cfg).build_request(cfg, incumbent, RAW_TEXT, None)
+    assert (request.method, request.url) == ("POST", "https://api.openai.com/v1/decisions")
+    assert request.headers == {"content-type": "application/json"}
+    body = request.body
+    # no store, temperature, reasoning, max-token or cache parameters
+    assert set(body) == {"model", "input", "questions"}
+    assert body["model"] == "gpt-6-luna"
+    assert body["input"] == RAW_TEXT
+    (question,) = body["questions"]
+    assert set(question) == {"type", "name", "instructions", "choices"}
+    assert (question["type"], question["name"]) == ("choice", "intent")
+    assert question["instructions"] == f"{incumbent.routing_instruction} {incumbent.oos_clause}"
+    *intents, oos = question["choices"]
+    assert oos == {"value": OUT_OF_SCOPE, "description": "The customer message is about none of the other options."}
+    catalog = incumbent.catalog[::-1] if DECISIONS_EXPECTED[cid] else incumbent.catalog
+    assert intents == [{"value": e.intent, "description": f"{e.description} Example: {e.example}"} for e in catalog]
+
+
+def test_r1_decisions_design_hash_tracks_option_order(incumbent: Prompt) -> None:
+    normal, reversed_order = CONFIGS["luna-dec"], CONFIGS["luna-dec-reversed"]
+    assert schema_sha256(normal, incumbent) != schema_sha256(reversed_order, incumbent)
+    assert schema_sha256(normal, incumbent) not in {
+        schema_sha256(CONFIGS[c], incumbent) for c in ("luna-none", "jev-c51")
+    }
+
+
+def test_get_adapter_refuses_an_api_the_provider_lacks() -> None:
+    with pytest.raises(ValueError, match="no adapter"):
+        get_adapter(CONFIGS["haiku55-off"].model_copy(update={"api": "decisions"}))
+
+
 def test_r1_jev_refuses_alias_model(incumbent: Prompt) -> None:
-    adapter = get_adapter("typesafe")
+    adapter = get_adapter(CONFIGS["jev-c51"])
     for alias in ("jev-latest", "jev-preview"):
         cfg = CONFIGS["jev-c51"].model_copy(update={"model": alias})
         with pytest.raises(ValueError, match="pinned"):
@@ -201,18 +241,19 @@ def test_r1_jev_refuses_alias_model(incumbent: Prompt) -> None:
 def test_r1_no_credentials_in_requests(incumbent: Prompt) -> None:
     for cid in SNAPSHOT_IDS:
         cfg = CONFIGS[cid]
-        adapter = get_adapter(cfg.provider)
+        adapter = get_adapter(cfg)
         request = adapter.build_request(cfg, incumbent, RAW_TEXT, adapter.cache_key(cfg, "ab" * 32))
         lowered = {k.lower() for k in request.headers}
         assert not lowered & {"authorization", "x-api-key"}
         assert FAKE_KEY not in json.dumps([request.url, request.headers, request.body])
-    assert get_adapter("openai").auth_headers(FAKE_KEY) == {"Authorization": f"Bearer {FAKE_KEY}"}
-    assert get_adapter("anthropic").auth_headers(FAKE_KEY) == {"x-api-key": FAKE_KEY}
-    assert get_adapter("typesafe").auth_headers(FAKE_KEY) == {"Authorization": f"Bearer {FAKE_KEY}"}
+    assert get_adapter(CONFIGS["inc"]).auth_headers(FAKE_KEY) == {"Authorization": f"Bearer {FAKE_KEY}"}
+    assert get_adapter(CONFIGS["luna-dec"]).auth_headers(FAKE_KEY) == {"Authorization": f"Bearer {FAKE_KEY}"}
+    assert get_adapter(CONFIGS["haiku55-off"]).auth_headers(FAKE_KEY) == {"x-api-key": FAKE_KEY}
+    assert get_adapter(CONFIGS["jev-c51"]).auth_headers(FAKE_KEY) == {"Authorization": f"Bearer {FAKE_KEY}"}
 
 
 def test_r1_inc_prompt_cache_key_mapping(incumbent: Prompt) -> None:
-    adapter = get_adapter("openai")
+    adapter = get_adapter(CONFIGS["inc"])
     inc = CONFIGS["inc"]
     assert adapter.cache_key(inc, "0" * 64) == "msc-0"
     assert adapter.cache_key(inc, "0" * 63 + "f") == "msc-15"
@@ -227,13 +268,14 @@ def test_r1_inc_prompt_cache_key_mapping(incumbent: Prompt) -> None:
 
 
 def test_r1_warmup_cache_keys() -> None:
-    assert get_adapter("openai").warmup_cache_keys(CONFIGS["inc"]) == [f"msc-{i}" for i in range(16)]
+    assert get_adapter(CONFIGS["inc"]).warmup_cache_keys(CONFIGS["inc"]) == [f"msc-{i}" for i in range(16)]
     for cid in SNAPSHOT_IDS:
         cfg = CONFIGS[cid]
         if cid == "inc":
             continue
-        expected: list[str | None] = [] if cfg.provider == "typesafe" else [None]
-        assert get_adapter(cfg.provider).warmup_cache_keys(cfg) == expected, cid
+        no_warmup = cfg.provider == "typesafe" or cid in DECISIONS_EXPECTED
+        expected: list[str | None] = [] if no_warmup else [None]
+        assert get_adapter(cfg).warmup_cache_keys(cfg) == expected, cid
 
 
 # --- T-R2: response normalization from fixtures --------------------------------------------------------------------
@@ -246,7 +288,7 @@ def _fixture(name: str) -> tuple[Configuration, httpx.Headers, dict[str, Any]]:
 
 def _parse(name: str, prompt: Prompt) -> tuple[Parsed, str | None, dict[str, str]]:
     cfg, headers, body = _fixture(name)
-    adapter = get_adapter(cfg.provider)
+    adapter = get_adapter(cfg)
     return adapter.parse_response(cfg, prompt, body), adapter.request_id(headers), adapter.rate_limit_headers(headers)
 
 
@@ -304,7 +346,7 @@ def test_p2_r2_openai_truncation(incumbent: Prompt) -> None:
 def test_p2_openai_content_filter(incumbent: Prompt) -> None:
     cfg, _, body = _fixture("doc-openai-luna-none-cache-read.json")
     body = {**body, "status": "incomplete", "incomplete_details": {"reason": "content_filter"}}
-    parsed = get_adapter("openai").parse_response(cfg, incumbent, body)
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
     assert (parsed.status, parsed.error_code) == ("invalid_output", "content_filter")
     assert parsed.stop_reason == "content_filter"
 
@@ -348,7 +390,7 @@ def test_p2_r2_anthropic_unbilled_refusal_bills_zero_and_keeps_reported_counts(i
 def test_p2_anthropic_other_unbilled_refusal_categories(incumbent: Prompt, category: str | None) -> None:
     cfg, _, body = _fixture("doc-anthropic-refusal.json")
     body = {**body, "stop_details": {"type": "refusal", "category": category, "explanation": None}}
-    parsed = get_adapter("anthropic").parse_response(cfg, incumbent, body)
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
     assert (parsed.status, parsed.error_code, parsed.usage) == ("invalid_output", "refusal", Usage())
     assert json.loads(parsed.raw_output)["stop_details"]["category"] == category
 
@@ -363,7 +405,7 @@ def test_p2_r2_anthropic_billed_refusal_category_is_charged(incumbent: Prompt) -
     assert request_id == "req_01Hb7RkQpLm2VnTzW4sYcXbD"
     for category in ("frontier_llm", "reasoning_extraction", "some_future_category"):
         changed = {**body, "stop_details": {**body["stop_details"], "category": category}}
-        assert get_adapter("anthropic").parse_response(cfg, incumbent, changed).usage == parsed.usage, category
+        assert get_adapter(cfg).parse_response(cfg, incumbent, changed).usage == parsed.usage, category
 
 
 def test_p2_anthropic_mid_output_or_uncategorized_refusal_is_charged(incumbent: Prompt) -> None:
@@ -373,12 +415,12 @@ def test_p2_anthropic_mid_output_or_uncategorized_refusal_is_charged(incumbent: 
         "content": [{"type": "text", "text": '{"intent": "card_'}],
         "usage": {**body["usage"], "output_tokens": 7},
     }
-    parsed = get_adapter("anthropic").parse_response(cfg, incumbent, mid_output)
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, mid_output)
     assert (parsed.status, parsed.error_code) == ("invalid_output", "refusal")
     assert parsed.usage == Usage(uncached_input=2757, output=7)
     assert parsed.raw_output == '{"intent": "card_'
     no_details = {k: v for k, v in body.items() if k != "stop_details"}  # category unknown: charge
-    assert get_adapter("anthropic").parse_response(cfg, incumbent, no_details).usage == Usage(uncached_input=2757)
+    assert get_adapter(cfg).parse_response(cfg, incumbent, no_details).usage == Usage(uncached_input=2757)
 
 
 def test_p2_r2_anthropic_truncation(incumbent: Prompt) -> None:
@@ -415,13 +457,16 @@ def test_r2_raw_output_capped_for_llms_only(incumbent: Prompt) -> None:
     cfg, _, body = _fixture("doc-anthropic-off-cache-write.json")
     long_text = '{"intent": "card_arrival", "confidence": 0.9' + " " * 3000 + "}"
     body = {**body, "content": [{"type": "text", "text": long_text}]}
-    parsed = get_adapter("anthropic").parse_response(cfg, incumbent, body)
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
     assert parsed.status == "ok"  # parsed from the full text, stored capped
     assert parsed.raw_output == long_text[:RAW_OUTPUT_CAP]
     cfg, _, body = _fixture("doc-typesafe-c51-ok.json")
     body = {**body, "note": "x" * 3000}  # Jev raw_output is the full response JSON, never capped
-    jev = get_adapter("typesafe").parse_response(cfg, incumbent, body)
+    jev = get_adapter(cfg).parse_response(cfg, incumbent, body)
     assert json.loads(jev.raw_output) == body
+    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
+    body = {**body, "note": "x" * 3000}  # so is the Decisions API's
+    assert json.loads(get_adapter(cfg).parse_response(cfg, incumbent, body).raw_output) == body
 
 
 # --- T-P2: Jev invalid outputs -------------------------------------------------------------------------------------
@@ -447,7 +492,7 @@ def test_p2_jev_invalid_fixtures(incumbent: Prompt, name: str, code: str) -> Non
 def _mutated_jev(name: str, prompt: Prompt, mutate: Any) -> Parsed:
     cfg, _, body = _fixture(name)
     mutate(body["answers"])
-    return get_adapter("typesafe").parse_response(cfg, prompt, body)
+    return get_adapter(cfg).parse_response(cfg, prompt, body)
 
 
 def _set(path: tuple[str, ...], value: Any) -> Any:
@@ -497,6 +542,154 @@ def test_p2_jev_probability_sum_within_tolerance_is_ok(incumbent: Prompt, factor
 
 
 def test_p2_jev_reversed_order_accepts_same_criteria(incumbent: Prompt) -> None:
+    cfg = CONFIGS["jev-noul-reversed"]
     _, _, body = _fixture("doc-typesafe-noul-ok.json")
-    parsed = get_adapter("typesafe").parse_response(CONFIGS["jev-noul-reversed"], incumbent, body)
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
     assert (parsed.status, parsed.match_probability) == ("ok", 0.93)
+
+
+# --- T-R2, T-P2: Decisions API (`luna-dec`) ------------------------------------------------------------------------
+
+
+def test_r2_decisions_ok(incumbent: Prompt) -> None:
+    parsed, request_id, limits = _parse("doc-openai-decisions-ok.json", incumbent)
+    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
+    (answer,) = body["answers"]
+    assert (parsed.status, parsed.intent, parsed.confidence) == ("ok", "card_arrival", 0.949)
+    assert parsed.probabilities == {p["value"]: p["probability"] for p in answer["probabilities"]}
+    assert parsed.probabilities is not None and list(parsed.probabilities) == incumbent.enum
+    assert (parsed.match_probability, parsed.case_normalized, parsed.stop_reason) == (None, False, None)
+    assert parsed.model_id == "gpt-6-luna"
+    assert parsed.usage == Usage(uncached_input=2318, output=0, reasoning=0)
+    assert json.loads(parsed.raw_output) == body
+    assert request_id == "req_dec_ok_0001"
+    assert limits["x-ratelimit-limit-requests"] == "30000" and limits["openai-processing-ms"] == "142"
+    assert attempt_cost_usd(PRICES, cfg, parsed.usage) == pytest.approx(2318 * 0.10e-6)
+
+
+def test_r2_decisions_usage_classes_and_input_only_cost(incumbent: Prompt) -> None:
+    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
+    usage = {
+        "input_tokens": 2318,
+        "input_tokens_details": {"cached_tokens": 2048, "cache_write_tokens": 0},
+        "output_tokens": 7,
+        "output_tokens_details": {"reasoning_tokens": 7},
+    }
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, {**body, "usage": usage})
+    assert parsed.usage == Usage(uncached_input=270, cache_read=2048, cache_write=0, output=7, reasoning=7)
+    # cached input priced as input, output free (spec §10)
+    assert attempt_cost_usd(PRICES, cfg, parsed.usage) == pytest.approx(2318 * 0.10e-6)
+
+
+def test_r2_openai_usage_cache_counters_above_input_never_go_negative(incumbent: Prompt) -> None:
+    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
+    usage = {"input_tokens": 100, "input_tokens_details": {"cached_tokens": 80, "cache_write_tokens": 40}}
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, {**body, "usage": usage})
+    assert parsed.usage == Usage(uncached_input=0, cache_read=80, cache_write=40, output=0, reasoning=None)
+
+
+def test_r2_decisions_reversed_order_accepts_same_values(incumbent: Prompt) -> None:
+    _, _, body = _fixture("doc-openai-decisions-ok.json")
+    cfg = CONFIGS["luna-dec-reversed"]
+    parsed = get_adapter(cfg).parse_response(cfg, incumbent, body)
+    assert (parsed.status, parsed.intent) == ("ok", "card_arrival")
+
+
+@pytest.mark.parametrize(
+    ("name", "code"),
+    [
+        ("doc-openai-decisions-refusal.json", "refusal"),
+        ("doc-openai-decisions-two-answers.json", "unexpected_answer"),
+        ("doc-openai-decisions-choice-outside-values.json", "unknown_choice"),
+        ("doc-openai-decisions-probabilities-sum-0.9.json", "probabilities_sum"),
+        ("doc-openai-decisions-missing-confidence.json", "missing_field"),
+    ],
+)
+def test_p2_decisions_invalid_fixtures(incumbent: Prompt, name: str, code: str) -> None:
+    parsed, request_id, _ = _parse(name, incumbent)
+    assert (parsed.status, parsed.error_code) == ("invalid_output", code)
+    assert parsed.intent is None and parsed.confidence is None and parsed.probabilities is None
+    assert parsed.usage.uncached_input == 2318  # still billed
+    _, _, body = _fixture(name)
+    assert json.loads(parsed.raw_output) == body  # full response kept
+    assert request_id is not None
+
+
+def _mutated_decision(prompt: Prompt, mutate: Any) -> Parsed:
+    cfg, _, body = _fixture("doc-openai-decisions-ok.json")
+    mutate(body["answers"])
+    return get_adapter(cfg).parse_response(cfg, prompt, body)
+
+
+def _set_answer(field: str, value: Any) -> Any:
+    def mutate(answers: list[dict[str, Any]]) -> None:
+        answers[0][field] = value
+
+    return mutate
+
+
+def _edit_probabilities(edit: Any) -> Any:
+    def mutate(answers: list[dict[str, Any]]) -> None:
+        answers[0]["probabilities"] = edit(answers[0]["probabilities"])
+
+    return mutate
+
+
+def _scaled(factor: float) -> Any:
+    return _edit_probabilities(lambda ps: [{**p, "probability": p["probability"] * factor} for p in ps])
+
+
+@pytest.mark.parametrize(
+    ("mutate", "code"),
+    [
+        (lambda a: a.clear(), "missing_answer"),
+        (_set_answer("name", "department"), "wrong_answer_name"),
+        (_set_answer("type", "predicate"), "wrong_answer_type"),
+        (_set_answer("choice", "Card_Arrival"), "unknown_choice"),  # no case normalization: values are typed
+        (_set_answer("choice", True), "unknown_choice"),
+        (_set_answer("confidence", 1.2), "confidence_out_of_range"),
+        (_set_answer("confidence", -0.1), "confidence_out_of_range"),
+        (_set_answer("confidence", "high"), "confidence_not_numeric"),
+        (lambda a: a[0].pop("probabilities"), "probabilities_missing"),
+        (_edit_probabilities(lambda ps: ps[1:]), "probabilities_keys"),
+        (_edit_probabilities(lambda ps: [*ps, {"value": "other", "probability": 0.0}]), "probabilities_keys"),
+        (_edit_probabilities(lambda ps: [*ps[:-1], ps[0]]), "probabilities_keys"),  # duplicate value
+        (_edit_probabilities(lambda ps: [{**ps[0], "probability": None}, *ps[1:]]), "probabilities_not_numeric"),
+        (_scaled(1.02), "probabilities_sum"),
+    ],
+)
+def test_p2_decisions_invalid_values(incumbent: Prompt, mutate: Any, code: str) -> None:
+    parsed = _mutated_decision(incumbent, mutate)
+    assert (parsed.status, parsed.error_code) == ("invalid_output", code)
+
+
+@pytest.mark.parametrize("factor", [0.991, 1.009])
+def test_p2_decisions_probability_sum_within_tolerance_is_ok(incumbent: Prompt, factor: float) -> None:
+    assert _mutated_decision(incumbent, _scaled(factor)).status == "ok"
+
+
+def test_p2_decisions_http_400_is_api_error(incumbent: Prompt) -> None:
+    cfg = CONFIGS["luna-dec"]
+    adapter = get_adapter(cfg)
+    seen: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        error = {"error": {"type": "invalid_request_error", "code": "too_many_choices", "message": "bad"}}
+        return httpx.Response(400, json=error, headers={"x-request-id": "req_dec_400"})
+
+    async def go() -> SendResult:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            sender = Sender(client=client, adapter=adapter, api_key=FAKE_KEY, clock=FakeClock())
+            return await sender.send(
+                adapter.build_request(cfg, incumbent, RAW_TEXT, None),
+                tokens=10,
+                parse=lambda body: adapter.parse_response(cfg, incumbent, body),
+                timeout_usage=Usage,
+            )
+
+    result = asyncio.run(go())
+    assert (result.parsed, result.error_code) == (None, "http_400")
+    assert [a.request_id for a in result.attempts] == ["req_dec_400"]
+    assert str(seen[0].url) == "https://api.openai.com/v1/decisions"
+    assert seen[0].headers["authorization"] == f"Bearer {FAKE_KEY}"

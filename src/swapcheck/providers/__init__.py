@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+from swapcheck.configs import Configuration
 from swapcheck.providers.anthropic_messages import AnthropicMessagesAdapter
 from swapcheck.providers.base import ProviderAdapter
+from swapcheck.providers.openai_decisions import OpenAIDecisionsAdapter
 from swapcheck.providers.openai_responses import OpenAIResponsesAdapter
 from swapcheck.providers.typesafe_systemone import TypeSafeSystemOneAdapter
 
-_ADAPTERS: dict[str, ProviderAdapter] = {
-    "openai": OpenAIResponsesAdapter(),
-    "anthropic": AnthropicMessagesAdapter(),
-    "typesafe": TypeSafeSystemOneAdapter(),
+# (provider, api): `api` None is the provider's default API.
+_ADAPTERS: dict[tuple[str, str | None], ProviderAdapter] = {
+    ("openai", None): OpenAIResponsesAdapter(),
+    ("openai", "decisions"): OpenAIDecisionsAdapter(),
+    ("anthropic", None): AnthropicMessagesAdapter(),
+    ("typesafe", None): TypeSafeSystemOneAdapter(),
 }
 
 
-def get_adapter(provider: str) -> ProviderAdapter:
+def get_adapter(cfg: Configuration) -> ProviderAdapter:
     try:
-        return _ADAPTERS[provider]
+        return _ADAPTERS[(cfg.provider, cfg.api)]
     except KeyError:
-        raise ValueError(f"unknown provider {provider!r}") from None
+        raise ValueError(f"{cfg.id}: no adapter for provider {cfg.provider!r} with api {cfg.api!r}") from None

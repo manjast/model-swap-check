@@ -62,11 +62,11 @@ class Parsed(BaseModel):
     error_code: str | None = None
     stop_reason: str | None = None
     # LLMs: the model's text (capped at 2,000 chars by the runner); for an unbilled Anthropic refusal, the
-    # reported `stop_details` and `usage` as JSON (its `usage` here is zero). Jev: full response JSON.
+    # reported `stop_details` and `usage` as JSON (its `usage` here is zero). Jev, `luna-dec`: full response JSON.
     raw_output: str
     intent: str | None = None
     confidence: float | None = None
-    probabilities: dict[str, float] | None = None  # Jev only
+    probabilities: dict[str, float] | None = None  # Jev and `luna-dec` only
     match_probability: float | None = None  # jev-noul only
     case_normalized: bool = False
     model_id: str | None = None

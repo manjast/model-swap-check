@@ -2,7 +2,7 @@
 # priced with config/prices.yaml. No run may take a provider's spend past cap - reserve_margin_usd.
 
 caps_usd:
-  openai: 10.0
+  openai: 15.0
   anthropic: 10.0
   typesafe: 5.0
 

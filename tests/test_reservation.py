@@ -23,10 +23,10 @@ def outcomes(output: int) -> list[Usage]:
     ]
 
 
-@pytest.mark.parametrize("config_id", ["inc", "luna-none", "luna-medium", "haiku55-off", "jev-c51"])
+@pytest.mark.parametrize("config_id", ["inc", "luna-none", "luna-medium", "haiku55-off", "jev-c51", "luna-dec"])
 def test_r6_reservation_is_the_dearest_outcome_of_one_attempt(config_id: str) -> None:
     cfg = CONFIGS[config_id]
-    output = cfg.max_output_tokens if cfg.is_llm and cfg.max_output_tokens is not None else 0
+    output = 0 if cfg.is_decision_interface or cfg.max_output_tokens is None else cfg.max_output_tokens
     timeout_charge = Usage(uncached_input=INPUT, output=output)
     reserved = reservation_usd(PRICES, cfg, timeout_charge)
     costs = [attempt_cost_usd(PRICES, cfg, u) for u in outcomes(output)]
