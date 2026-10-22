@@ -1,0 +1,607 @@
+{
+  "run_id": "inc-latency-20261022T194349Z",
+  "config_id": "inc",
+  "config_sha256": "893a381edcd1582691563a216717a0a2c2d4b50c4ee3e4beabba23ea8d8dfee8",
+  "split": "latency",
+  "item_list_sha256": "578b6f07b2847fc99696c50ec2f0c03b343d884971e1999d2ec5c8631394ecef",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719",
+  "requested_model": "gpt-4o-mini-2024-07-18",
+  "returned_model_ids": [
+    "gpt-4o-mini-2024-07-18"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "c133c08ed8dffd8eb446368ec05fccabd2f4ce67",
+  "contract_tag_commit": "8e10a4c8a74335c12dcb023ba5cbff039896dab8",
+  "warmups": [
+    {
+      "cache_key": "msc-0",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 8409.798434004188,
+          "request_id": "req_72095fe35fbb4d68a9fabf4d2b4fa2a2",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1971",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 8398.510725994129,
+            "connect_ms": 5100.901925005019,
+            "tls_ms": 30.741770984604955
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-1",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1937.9358850419521,
+          "request_id": "req_b5ae25ddeea94213b86813f7abddfd49",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1575",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1923.4946350334212,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-2",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1109.6377599751577,
+          "request_id": "req_083bf0a4fe4d462d9436d5743ccdd9ca",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "742",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1101.1425519827753,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-3",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 2857.0407800143585,
+          "request_id": "req_53f2931fb338432d9b0106ed5161782b",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "2578",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 2843.583749025129,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-4",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1867.41552001331,
+          "request_id": "req_0e4a9db27178436090dc20bbbcf49894",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1599",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1861.7744270013645,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-5",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 512.7558850217611,
+          "request_id": "req_c686b71c23a842fea3a5cccc8c1a0e5b",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1554",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 477.6469790376723,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-6",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 596.9203129643574,
+          "request_id": "req_10c35c902d294b4ba11b6af42704fa39",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "646",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 586.9463539565913,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-7",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1042.1939580119215,
+          "request_id": "req_8c5ddfdfc72945ebad9500852247cfa8",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "781",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1027.384635002818,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-8",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1530.9842699789442,
+          "request_id": "req_eda75f97b98243fca11df137ff20977a",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1974",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1520.967759017367,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-9",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1019.3824470043182,
+          "request_id": "req_57d13c412e6048e4a87e7abf3523495d",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "617",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1005.1356760086492,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-10",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 847.1479159779847,
+          "request_id": "req_85095bad48ca49cf9e3683c046612266",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "567",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 829.3580199824646,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-11",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1726.1195299797691,
+          "request_id": "req_7f43ad18df8843459f37546e39cbae28",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "1443",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1710.9453639714047,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-12",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 903.5414059762843,
+          "request_id": "req_8ba1cd900b374c52b9a6f176e90dfea8",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "630",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 897.611353022512,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-13",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 226,
+            "cache_read": 2432,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1210.1247909595259,
+          "request_id": "req_ebc8e1d066c9408f90e08a5a97f28f07",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "905",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1201.7287489725277,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-14",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 2658,
+            "cache_read": 0,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1015.4365620110184,
+          "request_id": "req_da810a41c75c405aa656deda57d18ebe",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "743",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1006.5907289972529,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    },
+    {
+      "cache_key": "msc-15",
+      "attempts": [
+        {
+          "number": 1,
+          "http_status": 200,
+          "error": null,
+          "usage": {
+            "uncached_input": 226,
+            "cache_read": 2432,
+            "cache_write": 0,
+            "output": 12,
+            "reasoning": 0
+          },
+          "usage_estimated": false,
+          "latency_ms": 1015.3320310055278,
+          "request_id": "req_320228883cca44bb86f9fc0224ffe90e",
+          "retry_after_s": null,
+          "headers": {
+            "openai-processing-ms": "725",
+            "x-ratelimit-limit-requests": "5000",
+            "x-ratelimit-limit-tokens": "2000000",
+            "x-ratelimit-remaining-requests": "4999",
+            "x-ratelimit-remaining-tokens": "1997323",
+            "x-ratelimit-reset-requests": "12ms",
+            "x-ratelimit-reset-tokens": "80ms"
+          },
+          "timing": {
+            "headers_ms": 1006.1344790155999,
+            "connect_ms": null,
+            "tls_ms": null
+          }
+        }
+      ]
+    }
+  ],
+  "started_at": "2026-10-22T19:43:49Z",
+  "ended_at": "2026-10-22T20:01:24Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "study_id": "latency-20261022T194349Z",
+  "totals": {
+    "by_status": {
+      "ok": 200,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 110645,
+      "cache_read": 465664,
+      "cache_write": 0,
+      "output": 3186,
+      "reasoning": 0
+    },
+    "billed_usd": 0.05343315,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}
