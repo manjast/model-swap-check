@@ -290,6 +290,11 @@ def test_v4_policy_analysis_hand_values_limitation_and_verdicts_unchanged(
         assert record.split("\n## ")[0] == two[decision].split("\n## ")[0]  # header with the verdict
         if "**Verdict: NOT RUN**" not in record:
             assert record != two[decision]
+    low = contract.analysis.configurations | {"inc": inc_policy}
+    limited = contract.model_copy(update={"analysis": contract.analysis.model_copy(update={"configurations": low})})
+    records = write_decisions(runs, limited, items, groups, tmp_path / "limited")
+    assert all("Limitation (§7.8)" in record for record in records.values())  # NOT RUN records too
+    assert not any("Limitation (§7.8)" in record for record in one.values())
 
 
 def test_operational_flags_and_reported_tokens_never_change_rendered_verdict(tmp_path: Path) -> None:

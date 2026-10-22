@@ -549,7 +549,10 @@ def write_decisions(
             }
             rendered[decision] = (
                 f"# {decision}\n\n**Verdict: NOT RUN**\n\nReason: {not_run[decision]}.\n\n"
-                "Frozen dev numbers:\n```json\n" + json.dumps(dev, sort_keys=True) + "\n```\n"
+                + "".join(f"{line}\n\n" for line in _g3_limitation(a))
+                + "Frozen dev numbers:\n```json\n"
+                + json.dumps(dev, sort_keys=True)
+                + "\n```\n"
             )
             continue
         assert cfg is not None
