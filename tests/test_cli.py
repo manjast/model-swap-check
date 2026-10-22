@@ -49,7 +49,9 @@ def stop_at_ceiling(repo: Path, incumbent: Prompt, split: Split, reason: str) ->
 
 
 def run_args(config: str, split: str) -> argparse.Namespace:
-    return argparse.Namespace(config=config, split=split, run_id=None, retry_errors=None, ceiling_usd=None)
+    return argparse.Namespace(
+        config=config, split=split, run_id=None, retry_errors=None, ceiling_usd=None, contract_tag="contract-v1"
+    )
 
 
 def test_r6_cert_run_refused_after_a_provider_budget_stop(repo: Path, incumbent: Prompt) -> None:

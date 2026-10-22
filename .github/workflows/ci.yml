@@ -35,6 +35,7 @@ jobs:
       - name: Replay decision records from the committed runs
         run: |
           uv run --no-sync swapcheck decide --output-dir "$RUNNER_TEMP/decisions"
+          uv run --no-sync swapcheck jev-policy --output-dir "$RUNNER_TEMP/decisions"
           diff -r decisions "$RUNNER_TEMP/decisions"
       - name: Install gitleaks
         run: |

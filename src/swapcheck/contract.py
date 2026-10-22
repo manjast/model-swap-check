@@ -12,6 +12,7 @@ from swapcheck.groups import REPO_ROOT
 from swapcheck.records import Split
 
 CONTRACT_PATH = REPO_ROOT / "contracts" / "contract-v1.yaml"
+CONTRACT_V2_PATH = REPO_ROOT / "contracts" / "contract-v2.yaml"
 
 
 class ContractConfiguration(BaseModel):
@@ -77,6 +78,20 @@ class AnalysisContract(BaseModel):
     policy: dict[str, Calibration]  # §7.8 (amendment 1): each configuration's own tau at weighted dev W <= 2%
 
 
+class JevPolicy(BaseModel):
+    """Spec §7.9 (amendment 2), descriptive: J1 = `jev-c51` at its top confidence; J2 = `jev-noul` on the Noul match
+    probability where the Choice confidence is at the top. J1 and the incumbent reuse the base contract's runs."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    base_tag: str
+    incumbent_tau: float  # the base contract's tau_inc
+    j1: Calibration
+    j2: Calibration
+    code_version: str
+    records: dict[str, object]
+
+
 class Contract(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore")
 
@@ -84,6 +99,7 @@ class Contract(BaseModel):
     configurations: dict[str, ContractConfiguration]
     item_lists: dict[Split, str]  # split -> item-list SHA-256 (spec §10)
     analysis: AnalysisContract | None = None
+    jev_policy: JevPolicy | None = None  # contract-v2 only (spec §7.9)
 
 
 def load_contract(path: Path = CONTRACT_PATH) -> Contract:
