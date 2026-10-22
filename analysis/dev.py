@@ -9,6 +9,7 @@ Usage:
     python analysis/dev.py dx-use N          # check prompts/dx/iteration-N.md and make it prompts/luna-none-x.md
     python analysis/dev.py freeze            # selections, budget plan and margins -> contracts/contract-v1.yaml
     python analysis/dev.py freeze-v2         # amendment 2 (§7.9): Jev rules J1 and J2 -> contracts/contract-v2.yaml
+    python analysis/dev.py freeze-v3         # amendment 3 (§7.10): tau per risk limit -> contracts/contract-v3.yaml
 """
 
 from __future__ import annotations
@@ -35,12 +36,14 @@ from swapcheck.configs import Configuration, load_configurations
 from swapcheck.contract import (
     CONTRACT_PATH,
     CONTRACT_V2_PATH,
+    CONTRACT_V3_PATH,
     AnalysisContract,
     BudgetPlan,
     Contract,
     ContractConfiguration,
     JevPolicy,
     OrderSensitivity,
+    RiskLimits,
     SelectionRecords,
     load_contract,
 )
@@ -48,6 +51,7 @@ from swapcheck.contract import Calibration as FrozenCalibration
 from swapcheck.freeze import CONTRACT_TAG
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, IntentGroups, load_groups
 from swapcheck.jev_policy import TOP, fit_j2
+from swapcheck.manifest import load_manifest
 from swapcheck.outcomes import AnalysisRun, build_run, dev_weights, weighted_rates
 from swapcheck.records import ItemRow, RunMeta, read_meta, read_rows
 from swapcheck.report import discordance, write_pdisc
@@ -601,15 +605,94 @@ def cmd_freeze_v2(args: argparse.Namespace) -> int:
         item_lists={"cert": data.item_list_hash(inputs.splits["cert"])},
         jev_policy=policy,
     )
-    header = "# Written by `python analysis/dev.py freeze-v2` (spec §7.9, amendment 2). A change is a new version.\n"
-    CONTRACT_V2_PATH.write_text(
+    write_contract(CONTRACT_V2_PATH, contract, "freeze-v2", "§7.9, amendment 2")
+    print(yaml.safe_dump(policy.model_dump(mode="json"), sort_keys=False, allow_unicode=True))
+    return 0
+
+
+def write_contract(path: Path, contract: Contract, command: str, source: str) -> None:
+    header = f"# Written by `python analysis/dev.py {command}` (spec {source}). A change is a new version.\n"
+    path.write_text(
         header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
-    if load_contract(CONTRACT_V2_PATH) != contract:
+    if load_contract(path) != contract:
         raise SystemExit("the written contract does not read back unchanged")
-    print(f"wrote {CONTRACT_V2_PATH.relative_to(REPO_ROOT)}\n")
-    print(yaml.safe_dump(policy.model_dump(mode="json"), sort_keys=False, allow_unicode=True))
+    print(f"wrote {path.relative_to(REPO_ROOT)}\n")
+
+
+CONTRACT_V3_TAG = "contract-v3"
+RISK_LIMITS = tuple(Fraction(p, 100) for p in (1, 2, 5, 10, 15))  # §7.10
+INCUMBENT_FIXED = (0.0, 0.90)  # §7.10: no confidence gate; the confidence gpt-4o-mini states most often
+CERTIFIED = ("inc", "luna-none", "luna-none-x", "haiku55-off", "luna-dec", "jev-c51", "jev-noul")  # report order
+
+
+def cmd_freeze_v3(args: argparse.Namespace) -> int:
+    """Spec §7.10 (amendment 3): every certified configuration's own tau at each risk limit, into contract-v3."""
+    clean_code(("src", "analysis", "config"))
+    inputs = load(args.runs_dir)
+    base, jev = load_contract(CONTRACT_PATH), load_contract(CONTRACT_V2_PATH)
+    if base.analysis is None or jev.jev_policy is None:
+        raise SystemExit(f"{CONTRACT_PATH.name} has no analysis or {CONTRACT_V2_PATH.name} no Jev policy")
+    cert_runs = {e.config_id: e.contract_tag for e in load_manifest(inputs.runs_dir).runs if e.split == "cert"}
+    if set(cert_runs) != set(CERTIFIED):
+        raise SystemExit(f"§7.10 covers every configuration with a cert run: {sorted(cert_runs)}")
+    run_contracts = {cid: cert_runs[cid] for cid in CERTIFIED}
+    sources = {base.tag: base, jev.tag: jev}
+    configs = frozen_configurations(inputs.configs)
+    at_policy_limit = dict(base.analysis.policy) | {"jev-noul": jev.jev_policy.j2}  # §7.8 and §7.9 at 2%
+    thresholds: dict[str, list[FrozenCalibration]] = {}
+    dev_runs: dict[str, str] = {}
+    api_errors: dict[str, int] = {}
+    for cid, tag in run_contracts.items():
+        expected = sources[tag].configurations[cid]
+        r = require(inputs, cid, expected.prompt_sha256)
+        if configs[cid] != expected or (r.meta.config_sha256, r.meta.schema_sha256) != (
+            expected.config_sha256,
+            expected.schema_sha256,
+        ):
+            raise SystemExit(f"{cid}: the current configuration or dev run {r.meta.run_id} differs from {tag}")
+        if cid == "jev-noul":
+            split, groups = inputs.splits["dev"], inputs.groups
+            fits = [fit_j2(split, r.rows, groups, inputs.dev_counts, inputs.cert_counts, lim) for lim in RISK_LIMITS]
+        else:
+            run = usable(r.run)
+            weights = dev_weights(run.truth, inputs.dev_counts, inputs.cert_counts)
+            fits = [fit_candidate(run, weights, lim) for lim in RISK_LIMITS]
+        thresholds[cid] = [frozen(c) for c in fits]
+        if thresholds[cid][RISK_LIMITS.index(POLICY_LIMIT)] != at_policy_limit[cid]:
+            raise SystemExit(f"{cid}: at 2% the rule does not reproduce the frozen §7.8/§7.9 threshold")
+        dev_runs[cid] = r.meta.run_id
+        api_errors[cid] = r.run.status.count("api_error")
+    inc = usable(require(inputs, "inc").run)
+    weights = dev_weights(inc.truth, inputs.dev_counts, inputs.cert_counts)
+    fixed = [weighted_rates(inc, tau, weights) for tau in INCUMBENT_FIXED]
+    risk = RiskLimits(
+        limits=[float(lim) for lim in RISK_LIMITS],
+        run_contracts=run_contracts,
+        thresholds=thresholds,
+        incumbent_fixed=[
+            FrozenCalibration(tau=tau, dev_w=float(r.wrong), dev_a=float(r.automation))
+            for tau, r in zip(INCUMBENT_FIXED, fixed, strict=True)
+        ],
+        code_version=code_version(),
+        records={"dev_runs": dev_runs, "api_errors_left_out": api_errors},
+    )
+    contract = Contract(
+        tag=CONTRACT_V3_TAG,
+        configurations={cid: configs[cid] for cid in run_contracts},
+        item_lists={"cert": data.item_list_hash(inputs.splits["cert"])},
+        risk_limits=risk,
+    )
+    write_contract(CONTRACT_V3_PATH, contract, "freeze-v3", "§7.10, amendment 3")
+    print("§7.10 weighted dev, tau W/A (%):")
+    print(
+        table(
+            ("config", *(f"{lim * 100}%" for lim in RISK_LIMITS)),
+            [(cid, *(f"{c.tau:.2f} {pct(c.dev_w)}/{pct(c.dev_a)}" for c in cals)) for cid, cals in thresholds.items()],
+        )
+    )
+    print("incumbent fixed: " + ", ".join(f"{c.tau:.2f} {pct(c.dev_w)}/{pct(c.dev_a)}" for c in risk.incumbent_fixed))
     return 0
 
 
@@ -664,6 +747,7 @@ def main() -> int:
     p_freeze.set_defaults(func=cmd_freeze)
     p_freeze_v2 = sub.add_parser("freeze-v2")
     p_freeze_v2.set_defaults(func=cmd_freeze_v2)
+    sub.add_parser("freeze-v3").set_defaults(func=cmd_freeze_v3)
     args = ap.parse_args()
     result: int = args.func(args)
     return result

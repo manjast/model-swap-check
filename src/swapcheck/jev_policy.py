@@ -9,13 +9,11 @@ from pathlib import Path
 
 from swapcheck.calibrate import Calibration, fit_candidate
 from swapcheck.contract import Contract
-from swapcheck.data import Item, item_list_hash
-from swapcheck.decide import DecisionRefusal, policy_comparison, pp
+from swapcheck.data import Item
+from swapcheck.decide import DecisionRefusal, load_cert_runs, policy_comparison, pp
 from swapcheck.groups import IntentGroups
-from swapcheck.manifest import load_manifest, verify_manifest
 from swapcheck.outcomes import build_run, dev_weights, pair_runs
-from swapcheck.records import ItemRow, RunMeta, read_meta, read_rows
-from swapcheck.runner import run_validity
+from swapcheck.records import ItemRow
 
 REPORT = "A2-jev.md"
 TOP = 1.0  # Jev's top confidence after rounding: J1's threshold, and where J2 reads the Noul probability
@@ -41,11 +39,12 @@ def fit_j2(
     groups: IntentGroups,
     dev_counts: Mapping[str, int],
     cert_counts: Mapping[str, int],
+    limit: Fraction = POLICY_LIMIT,
 ) -> Calibration:
     """tau_J2: the §6 incumbent rule on the gated signal of a `jev-noul` dev run (API errors carry no weight)."""
     usable = gated_rows([row for row in rows if row.status != "api_error"])
     run = build_run(items, usable, split="dev", groups=groups, noul=True)
-    return fit_candidate(run, dev_weights(run.truth, dev_counts, cert_counts), POLICY_LIMIT)
+    return fit_candidate(run, dev_weights(run.truth, dev_counts, cert_counts), limit)
 
 
 def write_jev_policy(
@@ -60,30 +59,13 @@ def write_jev_policy(
     policy, a = contract.jev_policy, base.analysis
     if policy is None or a is None:
         raise DecisionRefusal([f"{contract.tag} has no Jev policy or {base.tag} no analysis (§7.9)"])
-    manifest = load_manifest(runs_dir)
-    problems = verify_manifest(manifest, base, runs_dir) + verify_manifest(manifest, contract, runs_dir)
+    wanted = {(base.tag, "inc"), (base.tag, "jev-c51"), (contract.tag, "jev-noul")}
+    loaded, problems = load_cert_runs(runs_dir, (base, contract), wanted, items)
     if policy.base_tag != base.tag or policy.incumbent_tau != a.incumbent_tau:
         problems.append(f"the Jev policy's base contract or τ_inc differs from {base.tag}")
     for cid in ("inc", "jev-c51"):
         if contract.configurations.get(cid) != base.configurations.get(cid):
             problems.append(f"{cid}: configuration hashes differ between {base.tag} and {contract.tag}")
-    cert_hash = item_list_hash(list(items))
-    if not (cert_hash == contract.item_lists.get("cert") == base.item_lists.get("cert")):
-        problems.append("cert items differ from the contracts' cert item lists")
-    wanted = {(base.tag, "inc"), (base.tag, "jev-c51"), (contract.tag, "jev-noul")}
-    loaded: dict[str, tuple[RunMeta, list[ItemRow]]] = {}
-    for entry in manifest.runs:
-        run_dir = runs_dir / entry.run_id
-        if entry.split != "cert" or (entry.contract_tag, entry.config_id) not in wanted:
-            continue
-        if not (run_dir / "run.json").exists():
-            continue  # reported by verify_manifest
-        meta, rows = read_meta(run_dir), read_rows(run_dir)
-        ok, why = run_validity(meta, rows)
-        if not ok or not meta.complete:
-            problems.append(why if not ok else f"{entry.run_id}: run is incomplete")
-        loaded[entry.config_id] = meta, rows
-    problems += [f"{cid}: required cert run under {tag} missing" for tag, cid in sorted(wanted) if cid not in loaded]
     if problems:
         raise DecisionRefusal(problems)
 

@@ -56,6 +56,32 @@ class DecisionRefusal(RuntimeError):
         super().__init__("decide refused:\n" + "\n".join(f"- {p}" for p in problems))
 
 
+def load_cert_runs(
+    runs_dir: Path, contracts: Sequence[Contract], wanted: set[tuple[str, str]], items: Sequence[Item]
+) -> tuple[dict[str, tuple[RunMeta, list[ItemRow]]], list[str]]:
+    """The `cert` runs of the wanted (contract tag, configuration) pairs, keyed by configuration, and the problems
+    that make a post hoc report (§7.9, §7.10) refuse: manifest, item-list, validity or completeness."""
+    manifest = load_manifest(runs_dir)
+    problems = [p for c in contracts for p in verify_manifest(manifest, c, runs_dir)]
+    cert_hash = item_list_hash(list(items))
+    if any(c.item_lists.get("cert") != cert_hash for c in contracts):
+        problems.append("cert items differ from the contracts' cert item lists")
+    loaded: dict[str, tuple[RunMeta, list[ItemRow]]] = {}
+    for entry in manifest.runs:
+        run_dir = runs_dir / entry.run_id
+        if entry.split != "cert" or (entry.contract_tag, entry.config_id) not in wanted:
+            continue
+        if not (run_dir / "run.json").exists():
+            continue  # reported by verify_manifest
+        meta, rows = read_meta(run_dir), read_rows(run_dir)
+        ok, why = run_validity(meta, rows)
+        if not ok or not meta.complete:
+            problems.append(why if not ok else f"{entry.run_id}: run is incomplete")
+        loaded[entry.config_id] = meta, rows
+    problems += [f"{cid}: required cert run under {tag} missing" for tag, cid in sorted(wanted) if cid not in loaded]
+    return loaded, problems
+
+
 def candidate_ids(a: AnalysisContract) -> dict[str, str | None]:
     return dict(
         zip(
@@ -120,17 +146,18 @@ def verdict(statuses: Sequence[GateStatus], *, noise_failed: bool = False) -> st
     return "SHIP" if all(s == "PASS" for s in statuses) else "INCONCLUSIVE"
 
 
-def _wilson_bounds(k: int, n: int, z: float) -> tuple[float, float]:
+def wilson_bounds(k: int, n: int, z: float) -> tuple[float, float]:
     p = k / n
     center = (p + z * z / (2 * n)) / (1 + z * z / n)
     radius = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
     return center - radius, center + radius
 
 
-def _wilson(k: int, n: int) -> str:
+def wilson(k: int, n: int) -> str:
+    """k/n with its two-sided 95% Wilson score interval."""
     if not n:
         return "undefined"
-    lower, upper = _wilson_bounds(k, n, NormalDist().inv_cdf(0.975))
+    lower, upper = wilson_bounds(k, n, NormalDist().inv_cdf(0.975))
     return f"{pp(k / n)} [{pp(lower)}, {pp(upper)}]"
 
 
@@ -141,8 +168,8 @@ def _rate_rows(run: AnalysisRun, tau: float, slices: Sequence[str], arm: str = "
         auto = r.auto_mask(tau)
         rows.append(
             f"| {arm + ' | ' if arm else ''}{name} | {len(r)} | "
-            f"{_wilson(int(np.count_nonzero(auto & ~r.correct)), len(r))} | "
-            f"{_wilson(int(np.count_nonzero(auto)), len(r))} |"
+            f"{wilson(int(np.count_nonzero(auto & ~r.correct)), len(r))} | "
+            f"{wilson(int(np.count_nonzero(auto)), len(r))} |"
         )
     return rows
 
@@ -190,7 +217,7 @@ def policy_comparison(
     z = NormalDist().inv_cdf(0.95)
     for arm, run, tau in (("incumbent", inc, tau_inc), ("candidate", cand, tau_cand)):
         wrong = int(np.count_nonzero(run.auto_mask(tau) & ~run.correct))
-        upper = _wilson_bounds(wrong, len(run), z)[1] if len(run) else None
+        upper = wilson_bounds(wrong, len(run), z)[1] if len(run) else None
         held = "undefined" if upper is None else f"{pp(upper)}: {'below' if upper < POLICY_LIMIT else 'not below'} 2%"
         lines.append(f"- {arm}: one-sided 95% upper Wilson bound of W = {held}.")
     if len(cand):
