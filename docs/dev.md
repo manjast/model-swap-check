@@ -1,6 +1,6 @@
 # Development runs and contract freeze (M4)
 
-**Date:** 2026-10-22, 10:16–12:07 UTC. Fifteen `dev` runs on all 3,075 `dev` items, in the spec §9.1 order within each provider, each with the spend ceiling of the pre-`dev` gate (docs/pilot.md). Every run is complete and valid: 0 API errors, 1 invalid output in 46,125 calls (`haiku55-low`). The records are in `runs/*-dev-*`. Everything below is reproduced by `python analysis/dev.py freeze`, which wrote [`contracts/contract-v1.yaml`](../contracts/contract-v1.yaml) and its selection records.
+**Date:** 2026-10-22, 10:16–12:07 UTC. Thirteen `dev` runs on all 3,075 `dev` items, in the spec §9.1 order within each provider, each with the spend ceiling of the pre-`dev` gate (docs/pilot.md). Every run is complete and valid: 0 API errors, 1 invalid output in 39,975 items (`haiku55-low`). The records are in `runs/*-dev-*`. Everything below is reproduced by `python analysis/dev.py freeze`, which wrote [`contracts/contract-v1.yaml`](../contracts/contract-v1.yaml) and its selection records.
 
 ## Spend
 

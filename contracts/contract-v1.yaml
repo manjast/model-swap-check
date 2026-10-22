@@ -321,7 +321,7 @@ analysis:
     bootstrap: 20261021
     reasoning: 20261021
     power: 20261021
-  code_version: src tree 418a323beacafbd2fa85ff75b04cd4075d6f17ec, analysis tree 884e88e42c8f7b0fbfebdb3f44a5511f2dd9fb06
+  code_version: src tree bb82167c21baa59dc1095573671bdde94edbe40f, analysis tree 884e88e42c8f7b0fbfebdb3f44a5511f2dd9fb06
   budget:
     planned_cert_runs:
     - inc
