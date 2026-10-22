@@ -108,8 +108,29 @@ In %. \* = the one-sided 95% upper bound of W is not below the limit. **Bold** =
 
 - **Cached prefixes make Luna and Haiku the cheapest.** The LLMs read a prompt prefix of a few thousand tokens from cache: Luna and Haiku at a tenth of their input price, `gpt-4o-mini` at half. Jev and the Decisions API bill only input and give no cache discount. So `jev-c51` costs about 3.7× `luna-none` per message and about two thirds of the incumbent; `luna-dec` costs about 6× `luna-none` on the same model. Jev's output tokens are free and are shown only for completeness.
 - **Wall clock and server time rank differently.** The incumbent's server time p50 is 0.76 s against 2.80 s wall clock. `luna-dec`'s server time is 4.7× shorter than `luna-none`'s at p50 (0.18 against 0.84 s), but its wall clock only 1.5× (1.04 against 1.54 s). Haiku and Jev report no server time.
-- **The runs were not all contemporaneous.** `inc`, `haiku55-off` and `jev-c51` started together at 12:39 UTC, one process per provider; the other OpenAI runs followed in the OpenAI process, partly overlapping the Haiku run, and `jev-noul` ran at 15:22 UTC. The two Jev designs differ by 3× in wall clock p50 on the same model, so time of day and load on this client are confounded with the configuration. These numbers do not rank providers by speed.
+- **The runs were not all contemporaneous.** `inc`, `haiku55-off` and `jev-c51` started together at 12:39 UTC, one process per provider; the other OpenAI runs followed in the OpenAI process, partly overlapping the Haiku run, and `jev-noul` ran at 15:22 UTC. The two Jev designs differ by 3× in wall clock p50 on the same model, so time of day and load on this client are confounded with the configuration. These numbers do not rank providers by speed; the latency study below does.
+- **Cache hit rate decides the cost order.** With nothing cached, `jev-c51` ($0.146) costs about half of `luna-none` ($0.277) and a third of `haiku55-off` ($0.452). It breaks even with `luna-none` at a cache hit rate of about 55% (65% when misses pay the 1.25× cache-write price) and with `haiku55-off` at about 78% (83%). The `cert` runs read the cache on 99.7–100% of calls.
 - **No flag.** No decision record raises `COST` or `LATENCY` (§7.2).
+
+## Latency study (§9.6, descriptive)
+
+- **Timeline:** protocol committed and pushed at 18:19:34 UTC (`540d4e1`) and code at 18:33:55 UTC (`c133c08`, tag `latency-v1`), both before any study call. Run `latency-20261022T194349Z`, 19:43–20:01 UTC: 200 rounds, six configurations interleaved one request at a time, from Belgrade over home Wi-Fi. 1,200 calls, 0 errors, 0 retries; billed $0.19.
+- **Record:** `decisions/latency.md`, written by `swapcheck latency-report` and replayed by CI.
+
+| Configuration | Total p50/p95 s | Server p50/p95 s |
+|---|---|---|
+| `inc` | 1.02/1.62 | 0.72/1.34 |
+| `luna-none` | 1.26/1.69 | 0.96/1.31 |
+| `luna-dec` | 0.28/0.60 | 0.08/0.39 |
+| `haiku55-off` | 1.25/2.08 | – |
+| `jev-c51` | 0.28/0.35 | – |
+| `jev-noul` | 0.28/0.40 | – |
+
+- **The decision interfaces are about 4× faster end to end.** Jev and the Decisions API answer in 0.28 s at p50, the three LLM configurations in 1.02–1.26 s. Jev has the tightest tail (p95 0.35 s).
+- **The Decisions API takes 12× less server time than Luna's Responses API** (0.08 against 0.96 s at p50), in line with OpenAI's "up to 10x faster".
+- **The network adds little from here.** A TCP connect to each API host takes 60–78 ms at p50; OpenAI calls spend 0.14–0.30 s outside the server at p50.
+- **Against TypeSafe's claims:** typesafe.ai headlines "193.6x Faster" on System One workflows and shows 0.114 s per task for Jev against 8.566 s for LLMs. From Belgrade, Jev takes 0.28 s including about 0.08 s of round trip, and the small LLMs without reasoning take 1.0–1.3 s: a 4× advantage on this router.
+- **The `cert` timings above measured this client under load.** At concurrency 16, Jev's p50 was 0.76–2.38 s; one request at a time, it is 0.28 s.
 
 ## Process notes
 

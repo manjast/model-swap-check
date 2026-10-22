@@ -249,6 +249,70 @@ def cmd_risk_limits(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_latency(args: argparse.Namespace) -> int:
+    """Run the separately registered, sequential latency study."""
+    import httpx
+
+    from swapcheck import budget, cost
+    from swapcheck.configs import load_configurations
+    from swapcheck.http import Sender
+    from swapcheck.latency import ORDER, LatencyError, frozen_entries, run_study
+    from swapcheck.providers import get_adapter
+
+    load_env()
+    configs = load_configurations()
+    prompts = {cid: prompt.load_prompt(configs[cid].prompt_path) for cid in ORDER}
+    runs_dir = REPO_ROOT / "runs"
+    try:
+        frozen_entries(runs_dir, configs, prompts)
+    except LatencyError as exc:
+        print(str(exc))
+        return 2
+    adapters = {cid: get_adapter(configs[cid]) for cid in ORDER}
+    keys = {}
+    for cid, adapter in adapters.items():
+        key = os.environ.get(adapter.api_key_env)
+        if not key:
+            raise SystemExit(f"{adapter.api_key_env} is not set (put it in .env)")
+        keys[cid] = key
+
+    async def go() -> int:
+        async with httpx.AsyncClient() as http_client:
+            senders = {cid: Sender(http_client, adapters[cid], keys[cid], trace_timing=True) for cid in ORDER}
+            try:
+                study = await run_study(
+                    client=args.client,
+                    rounds=args.rounds,
+                    items=data.load_splits(load_groups())["dev"],
+                    configs=configs,
+                    prompts=prompts,
+                    senders=senders,
+                    prices=cost.load_prices(),
+                    budget=budget.load_budget(),
+                    runs_dir=runs_dir,
+                    repo_root=REPO_ROOT,
+                )
+            except LatencyError as exc:
+                print(str(exc))
+                return 2
+        print(f"{study.study_id}: {'complete' if study.complete else study.incomplete_reason}")
+        return 0 if study.complete else 3
+
+    return asyncio.run(go())
+
+
+def cmd_latency_report(args: argparse.Namespace) -> int:
+    """Replay exactly one completed latency study."""
+    from swapcheck.latency import LatencyError, write_report
+
+    try:
+        write_report(args.runs_dir, args.output_dir)
+    except LatencyError as exc:
+        print(str(exc))
+        return 2
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Write measured dev discordance for margin selection."""
     from swapcheck.contract import load_contract
@@ -296,6 +360,14 @@ def main(argv: list[str] | None = None) -> int:
     p_limits.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v3.yaml")
     p_limits.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
     p_limits.set_defaults(func=cmd_risk_limits)
+    p_latency = sub.add_parser("latency", help="run the sequential descriptive latency study")
+    p_latency.add_argument("--client", required=True, help="client city and network type")
+    p_latency.add_argument("--rounds", type=int, default=200)
+    p_latency.set_defaults(func=cmd_latency)
+    p_latency_report = sub.add_parser("latency-report", help="replay exactly one complete latency study")
+    p_latency_report.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
+    p_latency_report.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
+    p_latency_report.set_defaults(func=cmd_latency_report)
     p_report = sub.add_parser("report", help="write final-plan own-threshold dev discordance")
     p_report.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
     p_report.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")

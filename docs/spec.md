@@ -370,6 +370,20 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 - **One run per configuration:** under a given contract tag the runner refuses a second new `run_id` for the same configuration and split; only resume and `--retry-errors` are allowed. Each `cert`/`aa` run is appended to `runs/manifest.yaml` by the runner when it starts.
 - **Freeze guard:** a `cert` or `aa` run starts only if tag `contract-v1` exists and `src/`, `prompts/`, `config/`, `contracts/` and `analysis/` are byte-identical to the tagged commit. `runs/` may change. `run.json` records the tag's commit.
 
+### 9.6 Latency study (after M5, descriptive)
+
+The `cert` latencies (§9.4) come from runs at concurrency 16 in partly different time windows, so they cannot compare providers. This study measures latency alone, written before any call is made. It has no verdict and no gate, and it does not change any decision record.
+
+- **Configurations:** `inc`, `luna-none`, `luna-dec`, `haiku55-off`, `jev-c51`, `jev-noul`, with their frozen `contract-v1`/`contract-v2` settings and prompts. `luna-none-x` is left out: same model and endpoint as `luna-none`.
+- **Items:** the first 200 `dev` items in split-file order. Routing outcomes are not analysed.
+- **Schedule:** 200 rounds. Round r sends item r once to every configuration, one request at a time (concurrency 1 across the whole study), with the configuration order rotated by one position per round, so each configuration takes each position about equally often. Before round 1, every configuration makes its usual warm-up calls (§4); they open the connections and caches and are excluded from the statistics.
+- **Client:** one `httpx.AsyncClient` with the run defaults (HTTP/1.1, keep-alive), from the machine of the `cert` runs. The report states the client's city, network type and the UTC window. The §9.2 retry policy applies; no rate limiter is needed at concurrency 1.
+- **Measured per attempt:** total time from sending the request to the end of the response body (as in §9.4); time to the response headers; whether the attempt opened a new connection, with its TCP connect and TLS handshake times; OpenAI's `openai-processing-ms`.
+- **Network baseline:** before each round, one timed TCP connect (no TLS, no request) to each provider's API host, closed at once. One TCP connect takes about one network round trip.
+- **Report** (`swapcheck latency-report`, replayed by CI): per configuration, the count of successful final attempts and of retries, and p50/p95 of total time and time to headers over successful final attempts; for OpenAI also p50/p95 of server time and of time to headers minus server time; per host, p50/p95 of the TCP connect baseline and the number of new connections with their connect and TLS p50. Errors are counted, not timed. Quantiles use the §9.4 method.
+- **Budget:** about $0.20 at the steady cost per message of the `cert` runs, at most about $0.40 with nothing cached. Every attempt passes the §9.5 admission against cap − $0.50 per provider.
+- **Records:** one run directory per configuration under `runs/`, as §10, with split `latency` and the study ID; the extra timings are stored per attempt. The budget guard counts them; `decide` and the manifest ignore them.
+
 ## 10. Records
 
 ### `runs/<run_id>/run.json`
@@ -423,7 +437,7 @@ Every plan fits its cap − $0.50, `medium` included. Measured reasoning/thinkin
 ## 12. Repository and workflow
 
 - **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The four APIs (OpenAI Responses and Decisions, Anthropic Messages, TypeSafe System One) are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
-- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run` (`--run-id`, `--retry-errors`, `--ceiling-usd`; `--capture-dir` also saves every 2xx response in the fixture format, used by the pilot), `decide` (`--runs-dir`, `--contract`, `--output-dir`; writes `decisions/*.md`, exits non-zero listing the problems when it refuses), `jev-policy` and `risk-limits` (the §7.9 and §7.10 reports, same options and refusal), `report` (`--pdisc-json PATH` for §7.3).
+- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run` (`--run-id`, `--retry-errors`, `--ceiling-usd`; `--capture-dir` also saves every 2xx response in the fixture format, used by the pilot), `decide` (`--runs-dir`, `--contract`, `--output-dir`; writes `decisions/*.md`, exits non-zero listing the problems when it refuses), `jev-policy` and `risk-limits` (the §7.9 and §7.10 reports, same options and refusal), `latency` (`--client`, `--rounds`; the §9.6 study) and `latency-report` (`--runs-dir`, `--output-dir`; writes `decisions/latency.md` from exactly one complete study, else refuses), `report` (`--pdisc-json PATH` for §7.3).
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
 
