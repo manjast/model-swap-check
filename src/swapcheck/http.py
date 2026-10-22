@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import httpx
 
 from swapcheck.providers.base import HttpRequest, ProviderAdapter
-from swapcheck.records import Attempt, Parsed, Usage
+from swapcheck.records import Attempt, Parsed, Timing, Usage
 
 if TYPE_CHECKING:
     from swapcheck.ratelimit import RateLimiter
@@ -131,6 +131,34 @@ class AttemptBudget(Protocol):
         ...
 
 
+# httpcore trace events of a new connection, mapped to the `Timing` field that stores their duration.
+_CONNECTION_PHASES = {"connection.connect_tcp": "connect_ms", "connection.start_tls": "tls_ms"}
+
+
+class _TimingTrace:
+    """httpx `trace` extension for one attempt (spec §9.6): time to response headers from `start`, and the
+    TCP connect and TLS handshake durations when the attempt opens a new connection."""
+
+    def __init__(self, clock: Clock, start: float) -> None:
+        self.clock = clock
+        self.start = start
+        self.timing = Timing()
+        self._started: dict[str, float] = {}
+
+    async def __call__(self, event: str, info: dict[str, Any]) -> None:
+        now = self.clock.monotonic()
+        if event == "http11.receive_response_headers.complete":
+            self.timing.headers_ms = (now - self.start) * 1000.0
+            return
+        phase, _, step = event.rpartition(".")
+        if phase not in _CONNECTION_PHASES:
+            return
+        if step == "started":
+            self._started[phase] = now
+        elif step == "complete" and phase in self._started:
+            setattr(self.timing, _CONNECTION_PHASES[phase], (now - self._started[phase]) * 1000.0)
+
+
 @dataclass
 class Sender:
     """Sends requests for one provider: auth, rate limit per attempt, timeouts and retries."""
@@ -145,6 +173,7 @@ class Sender:
     # Called with every 2xx JSON response (status, headers, body) before parsing; the pilot saves real
     # responses through it as T-R2 fixtures (spec §10).
     capture: Callable[[int, httpx.Headers, Mapping[str, Any]], None] | None = None
+    trace_timing: bool = False  # record a `Timing` per attempt (latency study, spec §9.6)
 
     def backoff_s(self, attempt_number: int, retry_after: float | None) -> float:
         """Full jitter over the capped exponential; a longer `retry-after` wins."""
@@ -166,8 +195,11 @@ class Sender:
         be admitted before it starts and is charged when it ends; a refused attempt ends the request
         with error code `budget`."""
         attempts: list[Attempt] = []
+        timing: Timing | None = None
 
         def record(attempt: Attempt) -> None:
+            if timing is not None:
+                attempt = attempt.model_copy(update={"timing": timing})
             attempts.append(attempt)
             if budget is not None:
                 budget.charge(attempt)
@@ -182,6 +214,11 @@ class Sender:
                 request.method, request.url, headers=headers, json=request.body, timeout=self.policy.timeout_s
             )
             start = self.clock.monotonic()
+            timing = None
+            if self.trace_timing:
+                trace = _TimingTrace(self.clock, start)
+                timing = trace.timing
+                http_request.extensions["trace"] = trace
             try:
                 async with asyncio.timeout(self.policy.timeout_s):
                     response = await self.client.send(http_request)

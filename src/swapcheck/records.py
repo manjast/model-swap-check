@@ -18,10 +18,10 @@ import gzip
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Status = Literal["ok", "invalid_output", "api_error"]
-Split = Literal["examples", "dev", "cert", "pilot", "aa"]
+Split = Literal["examples", "dev", "cert", "pilot", "aa", "latency"]
 RUN_JSON = "run.json"
 ITEMS_PLAIN = "items.jsonl"
 ITEMS_FINAL = "items.jsonl.gz"
@@ -38,6 +38,14 @@ class Usage(BaseModel):
     reasoning: int | None = None  # None when the provider does not report it
 
 
+class Timing(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    headers_ms: float | None = None
+    connect_ms: float | None = None
+    tls_ms: float | None = None
+
+
 class Attempt(BaseModel):
     """One HTTP attempt. A timed-out attempt carries an estimated, charged usage (spec §9.5)."""
 
@@ -52,6 +60,7 @@ class Attempt(BaseModel):
     request_id: str | None = None
     retry_after_s: float | None = None
     headers: dict[str, str] = {}  # the response's rate-limit and timing headers (spec §9.4), keys lowercased
+    timing: Timing | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Parsed(BaseModel):
@@ -137,6 +146,7 @@ class RunMeta(BaseModel):
     retry_errors_passes: int  # 1 from the moment the single pass starts
     retry_errors_rewritten: int
     retry_errors_in_progress: bool = False  # the pass started and has not finished; it can only be resumed
+    study_id: str | None = Field(default=None, exclude_if=lambda value: value is None)
     totals: RunTotals
 
 
