@@ -19,7 +19,7 @@
 | T-L2 | Met. After the warm-up, 100/100 calls read the cache for every Luna and Haiku 5.5 configuration (≥ 90% expected). `inc` (implicit, best effort): 98/100. |
 | T-L3 | Measured. The explicit mode is kept for `cert` (see Cache). |
 | T-L4 | Met. The cost model and pre-`dev` gate are computed from the pilot (see Cost and budget). Spec §11's planning table is updated. |
-| T-L5 | Met, except the TypeSafe account limit, which is not readable through the API (see Rate limits). |
+| T-L5 | Met. The TypeSafe account limit, which no header reports, was read from its console by Stefan (see Rate limits). |
 | T-L6 | Met. Ten real responses are in `tests/fixtures/responses/pilot-*.json` and drive T-R2, including one `jev-c51`, one `jev-noul` and one `luna-dec` response, plus two warm-ups with cache writes. Each keeps its request ID. Headers are limited to request IDs, rate limits, timing and content type. gitleaks is clean. |
 | T-L7 | Met (see Latency). |
 | T-L8 | Met. `jev-c51` 6%, `jev-noul` 4%, `luna-dec` 14% (see Option order). |
@@ -35,7 +35,7 @@
 | Luna explicit vs implicit cache mode | Equal billed cost; explicit is kept. See Cache. |
 | Token overhead of Claude's injected structured-output instructions | **882 input tokens per call.** The same `haiku55-off` request on "Hello" counted 4,377 input tokens with `output_config.format` and 3,495 without; a repeat with the format gave 4,377 again. The overhead sits in the cached prefix (4,368 tokens), so steady traffic pays it at the cache-read price. |
 | Reasoning/thinking tokens per item at `low` and `medium` | Mean / p90: `luna-low` 8 / 42, `luna-medium` 73 / 168, `haiku55-low` 73 / 220, `haiku55-medium` 114 / 269. |
-| Account rate limits | OpenAI 5,000 requests and 2,000,000 tokens per minute, the same for `gpt-4o-mini`, Luna Responses and Luna Decisions. Anthropic `claude-haiku-5-5`: 1,000 requests, 500,000 input tokens and 80,000 output tokens per minute. TypeSafe returns no rate-limit header, and its docs point to the console, which has not been read. `config/limits.yaml` is updated (see Rate limits). |
+| Account rate limits | OpenAI 5,000 requests and 2,000,000 tokens per minute, the same for `gpt-4o-mini`, Luna Responses and Luna Decisions. Anthropic `claude-haiku-5-5`: 1,000 requests, 500,000 input tokens and 80,000 output tokens per minute. TypeSafe (console, no header): 80 requests and 100,000 input tokens per second. `config/limits.yaml` is updated (see Rate limits). |
 | `openai-processing-ms` on Responses calls | Present on 100% of Responses and Decisions calls. |
 | Jev option-order sensitivity | `jev-c51` 6/100 (above 5%: stated as a limitation in D-J if c51 is selected); `jev-noul` 4/100. |
 | Jev latency from this machine | p50 0.9–3.3 s, p95 3.7–7.8 s. That is well above TypeSafe's "about 100 ms", which is measured at TypeSafe's own location; no server timing header exists to separate the network. |
@@ -132,4 +132,4 @@ These counts go into the contract (`order_sensitivity`, spec §7.7). `decide` th
 
 The limiter's Anthropic token estimate counts the whole prompt, but Anthropic counts only uncached input and cache writes toward its input limit. The limit therefore binds at about 170 requests per minute. That keeps input use far below the account limit, and output at the pilot's `medium` p90 at about 50,000 tokens per minute, under 80% of the 80,000 output limit.
 
-TypeSafe keeps 5 requests and 20,000 tokens per second, which produced no 429 in the pilot; its console value is still to be entered.
+TypeSafe: 80% of the console limits is 64 requests and 80,000 input tokens per second. The limiter's estimate (about 2,350 tokens per request) undercounts TypeSafe's own count by up to 2.04× (4,796 for `jev-noul`), so the token limit is set in estimate units to 39,000 per second. That allows about 16 requests per second, at most about 77,000 real tokens.

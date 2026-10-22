@@ -77,6 +77,33 @@ Two-sided 95% Wilson score intervals (unweighted, descriptive; no verdict).
 | account_other | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
 | out_of_scope | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 3.33 pp [0.59 pp, 16.67 pp] |
 
+## Policy analysis at the 2% limit (§7.8, amendment 1)
+
+Descriptive; it never changes the verdict. Each arm runs at its own τ fitted on dev to weighted W ≤ 2%: incumbent τ_2% = 0.70 (dev W 0.00 pp, A 80.00 pp), candidate τ_2% = 0.50 (dev W 2.00 pp, A 85.00 pp). Unweighted cert estimates on the paired items, two-sided 95% Wilson score intervals.
+
+| Arm | Scope | n | W [95% CI] | A [95% CI] |
+|---|---|---:|---|---|
+| incumbent | overall | 209 | 0.00 pp [0.00 pp, 1.80 pp] | 80.86 pp [74.99 pp, 85.62 pp] |
+| incumbent | cards | 29 | 0.00 pp [0.00 pp, 11.70 pp] | 93.10 pp [78.04 pp, 98.09 pp] |
+| incumbent | card_payments | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 93.33 pp [78.68 pp, 98.15 pp] |
+| incumbent | cash | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 96.67 pp [83.33 pp, 99.41 pp] |
+| incumbent | transfers | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 93.33 pp [78.68 pp, 98.15 pp] |
+| incumbent | top_ups | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 96.67 pp [83.33 pp, 99.41 pp] |
+| incumbent | account_other | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 93.33 pp [78.68 pp, 98.15 pp] |
+| incumbent | out_of_scope | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 0.00 pp [0.00 pp, 11.35 pp] |
+| candidate | overall | 209 | 2.87 pp [1.32 pp, 6.12 pp] | 86.12 pp [80.78 pp, 90.16 pp] |
+| candidate | cards | 29 | 3.45 pp [0.61 pp, 17.18 pp] | 100.00 pp [88.30 pp, 100.00 pp] |
+| candidate | card_payments | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
+| candidate | cash | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
+| candidate | transfers | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
+| candidate | top_ups | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
+| candidate | account_other | 30 | 0.00 pp [0.00 pp, 11.35 pp] | 100.00 pp [88.65 pp, 100.00 pp] |
+| candidate | out_of_scope | 30 | 3.33 pp [0.59 pp, 16.67 pp] | 3.33 pp [0.59 pp, 16.67 pp] |
+
+- incumbent: one-sided 95% upper Wilson bound of W = 1.28 pp: below 2%.
+- candidate: one-sided 95% upper Wilson bound of W = 5.45 pp: not below 2%.
+- A difference (candidate minus incumbent) = 5.26 pp; one-sided 95% Tango bounds [3.25 pp, 8.42 pp].
+
 ## Newly wrong auto-routes
 
 Messages are quoted from the split under test; Banking77 texts are CC BY 4.0 (Casanueva et al., 2020).

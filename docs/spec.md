@@ -1,6 +1,6 @@
 # Specification v4
 
-**Status:** draft for review, 2026-10-21. v2 incorporated an independent review of v1. v3 adds the reasoning-effort sweep and TypeSafe Jev. v4 adds OpenAI's Decisions API (D-O). Binding for M0–M7 once merged. Values marked *(M4)* are fixed from `dev` data before the contract is frozen. Values marked *(pilot)* are resolved by the M3 pilot.
+**Status:** draft for review, 2026-10-21. v2 incorporated an independent review of v1. v3 adds the reasoning-effort sweep and TypeSafe Jev. v4 adds OpenAI's Decisions API (D-O). Binding for M0–M7 once merged. Values marked *(M4)* are fixed from `dev` data before the contract is frozen. Values marked *(pilot)* are resolved by the M3 pilot. **Amendment 1** (2026-10-22, after the incumbent's `dev` run and before any candidate `dev` run or `cert` call) adds the descriptive §7.8; nothing registered before it changes.
 
 **Question.** A production support-message router built on `gpt-4o-mini` has to move: OpenAI removes `gpt-4o-mini` from its API on 2027-01-14. There are four ways out:
 
@@ -256,9 +256,17 @@ Each LLM candidate is also scored at `τ_inc`: unweighted estimates and two-side
   - slices and seeds;
   - the analysis code version;
   - the budget plan: planned `cert` runs, drop order and NOT RUN decisions with reasons (§9.5);
-  - the pilot's option-order sensitivity per decision interface, as changed and total items (§14).
+  - the pilot's option-order sensitivity per decision interface, as changed and total items (§14);
+  - the §7.8 policy thresholds with their weighted `dev` W and A.
 - **Timing:** committed and tagged `contract-v1` before the first `cert` call.
 - **Changes:** any change after that is a new contract version with a written reason, never an edit.
+
+### 7.8 Policy analysis at the 2% limit (amendment 1, descriptive)
+
+- **Why it was added.** Only the incumbent's `dev` run had been seen; no candidate `dev` run had started and no `cert` item had been read. That run showed `gpt-4o-mini` stating its confidence in steps of 0.05, with 0.9 on 1,994 of the 2,618 items it routed (470 of them wrong). §6 therefore puts `τ_inc` at 0.95, with weighted `dev` W 0.00% and A 1.83%. With the incumbent automating less than G3's 3.0 pp margin, G3 cannot fail, even for a candidate that auto-routes nothing. And every candidate is matched to zero observed `dev` misroutes, so its τ rests on its single most confident error. The registered analysis stays the confirmatory one, unchanged. This section adds a descriptive one that never changes a verdict and was fixed before any candidate data existed.
+- **Thresholds.** Every configuration with a `dev` run in the final `cert` plan, the incumbent included, gets its own policy threshold `τ_2%`: the smallest τ ∈ T(config) with its own weighted `dev` W ≤ 2.0%, which is the §6 incumbent rule applied to each configuration (1.01 if none exists). It is frozen in the contract with its weighted `dev` W and A. For the incumbent, `τ_2%` = `τ_inc`.
+- **Reported on `cert`, per configuration:** W and A at `τ_2%`, overall and per slice, with two-sided 95% Wilson score intervals; whether the one-sided 95% upper Wilson bound of overall W is below 2%; and, for each candidate, the paired difference in A against the incumbent (both at `τ_2%`, `api_error` items in either arm dropped) with its one-sided 95% Tango lower and upper bounds.
+- **Stated limitation.** If the incumbent's weighted `dev` A at `τ_inc` is below the G3 margin, every decision record says so, with that A and the incumbent's `dev` W the candidates were matched to, and states that G3 cannot fail.
 
 ## 8. Selections made on `dev`
 
@@ -414,7 +422,7 @@ Every plan fits its cap − $0.50, `medium` included. Measured reasoning/thinkin
 
 ## 14. Open items
 
-Answered by the M3 pilot on 2026-10-22, with evidence, in [`pilot.md`](pilot.md); the TypeSafe account limit still needs a reading from its console.
+Answered by the M3 pilot on 2026-10-22, with evidence, in [`pilot.md`](pilot.md); the TypeSafe account limit was read from its console.
 
 | Item | Resolved at |
 |---|---|

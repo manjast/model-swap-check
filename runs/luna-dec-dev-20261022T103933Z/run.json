@@ -1,0 +1,45 @@
+{
+  "run_id": "luna-dec-dev-20261022T103933Z",
+  "config_id": "luna-dec",
+  "config_sha256": "7d35f91149329f4aa8ec042c60140722318d9d7d4f37ac944aab1cd3695f73ad",
+  "split": "dev",
+  "item_list_sha256": "d9b48997e5687359b338e47a0a1d763be0b8ca6533786f50b8b2c2beb04d1734",
+  "prompt_sha256": "40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a",
+  "schema_sha256": "97ff4d951a4a3c1bc8bd387b908c2ba5520f6f579aa87859eb6bb12c3c8e501e",
+  "requested_model": "gpt-6-luna",
+  "returned_model_ids": [
+    "gpt-6-luna"
+  ],
+  "versions": {
+    "python": "3.13.5",
+    "httpx": "0.28.1",
+    "swapcheck": "0.1.0"
+  },
+  "git_commit": "d22fb2dcbba941bee2b9718bb8fdbf43f52a26ba",
+  "contract_tag_commit": null,
+  "warmups": [],
+  "started_at": "2026-10-22T10:39:34Z",
+  "ended_at": "2026-10-22T10:47:19Z",
+  "complete": true,
+  "incomplete_reason": null,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "retry_errors_in_progress": false,
+  "totals": {
+    "by_status": {
+      "ok": 3075,
+      "invalid_output": 0,
+      "api_error": 0
+    },
+    "tokens": {
+      "uncached_input": 7140577,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 0,
+      "reasoning": 0
+    },
+    "billed_usd": 0.7140577,
+    "case_normalized": 0,
+    "n_429": 0
+  }
+}

@@ -225,3 +225,48 @@ analysis:
     luna-dec:
       changed: 14
       items: 100
+  policy:
+    inc:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-none:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    luna-low:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    luna-medium:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    haiku55-off:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    haiku55-low:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    haiku55-medium:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    jev-c51:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    jev-noul:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    luna-none-x:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85
+    luna-dec:
+      tau: 0.5
+      dev_w: 0.02
+      dev_a: 0.85

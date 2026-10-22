@@ -120,31 +120,88 @@ def verdict(statuses: Sequence[GateStatus], *, noise_failed: bool = False) -> st
     return "SHIP" if all(s == "PASS" for s in statuses) else "INCONCLUSIVE"
 
 
-def _wilson(k: int, n: int) -> str:
-    if not n:
-        return "undefined"
-    z = NormalDist().inv_cdf(0.975)
+def _wilson_bounds(k: int, n: int, z: float) -> tuple[float, float]:
     p = k / n
     center = (p + z * z / (2 * n)) / (1 + z * z / n)
     radius = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return f"{pp(p)} [{pp(center - radius)}, {pp(center + radius)}]"
+    return center - radius, center + radius
+
+
+def _wilson(k: int, n: int) -> str:
+    if not n:
+        return "undefined"
+    lower, upper = _wilson_bounds(k, n, NormalDist().inv_cdf(0.975))
+    return f"{pp(k / n)} [{pp(lower)}, {pp(upper)}]"
+
+
+def _rate_rows(run: AnalysisRun, tau: float, slices: Sequence[str], arm: str = "") -> list[str]:
+    rows = []
+    for name in ("overall", *slices):
+        r = run if name == "overall" else run.take([i for i, s in enumerate(run.slices) if s == name])
+        auto = r.auto_mask(tau)
+        rows.append(
+            f"| {arm + ' | ' if arm else ''}{name} | {len(r)} | "
+            f"{_wilson(int(np.count_nonzero(auto & ~r.correct)), len(r))} | "
+            f"{_wilson(int(np.count_nonzero(auto)), len(r))} |"
+        )
+    return rows
 
 
 def naive_swap(run: AnalysisRun, tau_inc: float, slices: Sequence[str]) -> list[str]:
-    lines = [
+    return [
         "Two-sided 95% Wilson score intervals (unweighted, descriptive; no verdict).",
         "",
         "| Scope | n | W [95% CI] | A [95% CI] |",
         "|---|---:|---|---|",
+        *_rate_rows(run, tau_inc, slices),
     ]
-    for name in ("overall", *slices):
-        r = run if name == "overall" else run.take([i for i, s in enumerate(run.slices) if s == name])
-        auto = r.auto_mask(tau_inc)
+
+
+POLICY_LIMIT = 0.02
+
+
+def policy_analysis(inc: AnalysisRun, cand: AnalysisRun, a: AnalysisContract, cfg: str) -> list[str]:
+    """Spec §7.8 (amendment 1): both arms at their own dev-fitted tau for weighted W <= 2%; never a verdict."""
+    ti, tc = a.policy["inc"], a.policy[cfg]
+    lines = [
+        "## Policy analysis at the 2% limit (§7.8, amendment 1)",
+        "",
+        "Descriptive; it never changes the verdict. Each arm runs at its own τ fitted on dev to weighted W ≤ 2%: "
+        f"incumbent τ_2% = {ti.tau:.2f} (dev W {pp(ti.dev_w)}, A {pp(ti.dev_a)}), "
+        f"candidate τ_2% = {tc.tau:.2f} (dev W {pp(tc.dev_w)}, A {pp(tc.dev_a)}). "
+        "Unweighted cert estimates on the paired items, two-sided 95% Wilson score intervals.",
+        "",
+        "| Arm | Scope | n | W [95% CI] | A [95% CI] |",
+        "|---|---|---:|---|---|",
+        *_rate_rows(inc, ti.tau, a.slices, "incumbent"),
+        *_rate_rows(cand, tc.tau, a.slices, "candidate"),
+        "",
+    ]
+    z = NormalDist().inv_cdf(0.95)
+    for arm, run, tau in (("incumbent", inc, ti.tau), ("candidate", cand, tc.tau)):
+        wrong = int(np.count_nonzero(run.auto_mask(tau) & ~run.correct))
+        upper = _wilson_bounds(wrong, len(run), z)[1] if len(run) else None
+        held = "undefined" if upper is None else f"{pp(upper)}: {'below' if upper < POLICY_LIMIT else 'not below'} 2%"
+        lines.append(f"- {arm}: one-sided 95% upper Wilson bound of W = {held}.")
+    if len(cand):
+        b = gate_g3(*counts(cand.auto_mask(tc.tau), inc.auto_mask(ti.tau))).bounds
         lines.append(
-            f"| {name} | {len(r)} | {_wilson(int(np.count_nonzero(auto & ~r.correct)), len(r))} | "
-            f"{_wilson(int(np.count_nonzero(auto)), len(r))} |"
+            f"- A difference (candidate minus incumbent) = {pp(b.estimate)}; one-sided 95% Tango bounds "
+            f"[{pp(b.lower)}, {pp(b.upper)}]."
         )
     return lines
+
+
+def _g3_limitation(a: AnalysisContract) -> list[str]:
+    """Spec §7.8: an incumbent automating less than G3's margin on dev cannot be undercut by enough to fail G3."""
+    inc = a.configurations["inc"]
+    if inc.dev_a >= 0.03:
+        return []
+    return [
+        f"Limitation (§7.8): the incumbent's weighted dev A at τ_inc is {pp(inc.dev_a)}, below the 3.00 pp G3 margin, "
+        "so G3 cannot fail while its cert A stays below the margin; candidates were matched to the incumbent's "
+        f"dev W of {pp(inc.dev_w)}. See the policy analysis."
+    ]
 
 
 def _gate_row(name: str, gate: GateResult, family: GateResult) -> str:
@@ -296,6 +353,7 @@ def _render(
         )
     if decision in ("D-J", "D-O"):
         lines.append(_order_sensitivity(cfg, a.order_sensitivity.get(cfg)))
+    lines += _g3_limitation(a)
     lines += [
         f"Paired n={len(ir)}; dropped API-error/absent items={paired.dropped}.",
         f"Frozen dev W={pp(a.configurations[cfg].dev_w)}; A={pp(a.configurations[cfg].dev_a)}; "
@@ -379,6 +437,7 @@ def _render(
         if decision in ("D-J", "D-O")
         else naive_swap(cr, ti, a.slices)
     )
+    lines += ["", *policy_analysis(ir, cr, a, cfg)]
     lines += [
         "",
         "## Newly wrong auto-routes",
@@ -452,6 +511,8 @@ def write_decisions(
             problems.append(f"{decision}: missing frozen calibration for {cfg}")
         if decision not in a.power:
             problems.append(f"{decision}: missing frozen power")
+        if cfg is not None and not {"inc", cfg} <= a.policy.keys():
+            problems.append(f"{decision}: missing frozen policy threshold (§7.8) for inc or {cfg}")
     if ("inc", "cert") not in loaded:
         problems.append("required incumbent cert run missing")
     if "aa" in a.budget.planned_cert_runs and ("inc", "aa") not in loaded:
@@ -488,7 +549,10 @@ def write_decisions(
             }
             rendered[decision] = (
                 f"# {decision}\n\n**Verdict: NOT RUN**\n\nReason: {not_run[decision]}.\n\n"
-                "Frozen dev numbers:\n```json\n" + json.dumps(dev, sort_keys=True) + "\n```\n"
+                + "".join(f"{line}\n\n" for line in _g3_limitation(a))
+                + "Frozen dev numbers:\n```json\n"
+                + json.dumps(dev, sort_keys=True)
+                + "\n```\n"
             )
             continue
         assert cfg is not None

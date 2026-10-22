@@ -1,0 +1,560 @@
+# Written by `python analysis/dev.py freeze` (spec §7.7). A change is a new contract version.
+tag: contract-v1
+configurations:
+  inc:
+    config_sha256: 893a381edcd1582691563a216717a0a2c2d4b50c4ee3e4beabba23ea8d8dfee8
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-none:
+    config_sha256: 12b1c30bb3dd9335cdd7c9bf984841d82e815f8e1423657c89d545c2fae6ef35
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-low:
+    config_sha256: c1605379d77d65ca9e391d7e8e36f32122b3242508e4aff9c0175a9a21dfabc1
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-medium:
+    config_sha256: 0b208e75627d21eccd45e861897b9d9094adc455a597a25579d0d22fe21b695c
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  haiku55-off:
+    config_sha256: e5ae7bdfba20a30faf03761e6fb5021efe06eaa59678bd3188c95d9a520db014
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  haiku55-low:
+    config_sha256: 7513ff9f60e1d2d6ffdff01e6396015fd705e52119b108bfa03ff35cd287d180
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  haiku55-medium:
+    config_sha256: 7032b95643d8e9e9f0eb5baa48ee62e404b73ebd9a9e6d148637183448addae7
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  jev-c51:
+    config_sha256: 8600d2c7dfd20fbcb0c5c1bcee4ffd5cb106cebfd10525052535e8f3f3d71dc1
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 51573188cdf90926278ee812292c9aad781e955c9628721a0b12b5b7d6d16be0
+  jev-noul:
+    config_sha256: e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 50ad902ab1ddb39bdc5242b5009f0e0d61985699a41669bd4a1b8d05c2551da8
+  luna-none-x:
+    config_sha256: ba3a1eea371f9d8641ce90e37d264e9a9137ee30ce8e507c7324017520154c81
+    prompt_sha256: 8b0ffa521ce81eb8d74d86450482fde4a05ef8a3864a3ceafd5fc45781840fb5
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-dec:
+    config_sha256: 7d35f91149329f4aa8ec042c60140722318d9d7d4f37ac944aab1cd3695f73ad
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 97ff4d951a4a3c1bc8bd387b908c2ba5520f6f579aa87859eb6bb12c3c8e501e
+item_lists:
+  dev: d9b48997e5687359b338e47a0a1d763be0b8ca6533786f50b8b2c2beb04d1734
+  cert: 5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b
+  aa: e97b2f3cd5dcc19c7501fe4594e0e5d1bacc698ce3e834b0018fe729945ad4ba
+analysis:
+  incumbent_tau: 0.95
+  configurations:
+    inc:
+      tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    jev-c51:
+      tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    jev-noul:
+      tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    luna-dec:
+      tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    luna-none:
+      tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.003161508505841361
+    haiku55-off:
+      tau: 0.97
+      dev_w: 0.0
+      dev_a: 0.027267370362779257
+    luna-low:
+      tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.001485960237753638
+    luna-medium:
+      tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.0005943840951014552
+    haiku55-low:
+      tau: 0.96
+      dev_w: 0.0
+      dev_a: 0.029591104734576757
+    haiku55-medium:
+      tau: 0.96
+      dev_w: 0.0
+      dev_a: 0.029345152695224433
+    luna-none-x:
+      tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.1364034638245542
+  dev_counts:
+    Refund_not_showing_up: 40
+    activate_my_card: 40
+    age_limit: 40
+    apple_pay_or_google_pay: 40
+    atm_support: 40
+    automatic_top_up: 40
+    balance_not_updated_after_bank_transfer: 40
+    balance_not_updated_after_cheque_or_cash_deposit: 40
+    beneficiary_not_allowed: 40
+    cancel_transfer: 40
+    card_about_to_expire: 40
+    card_acceptance: 40
+    card_arrival: 40
+    card_delivery_estimate: 40
+    card_linking: 40
+    card_not_working: 40
+    card_payment_fee_charged: 40
+    card_payment_not_recognised: 40
+    card_payment_wrong_exchange_rate: 40
+    card_swallowed: 40
+    cash_withdrawal_charge: 40
+    cash_withdrawal_not_recognised: 40
+    change_pin: 40
+    compromised_card: 40
+    contactless_not_working: 35
+    country_support: 40
+    declined_card_payment: 40
+    declined_cash_withdrawal: 40
+    declined_transfer: 40
+    direct_debit_payment_not_recognised: 40
+    disposable_card_limits: 40
+    edit_personal_details: 40
+    exchange_charge: 40
+    exchange_rate: 40
+    exchange_via_app: 40
+    extra_charge_on_statement: 40
+    failed_transfer: 40
+    fiat_currency_support: 40
+    get_disposable_virtual_card: 40
+    get_physical_card: 40
+    getting_spare_card: 40
+    getting_virtual_card: 40
+    lost_or_stolen_card: 40
+    lost_or_stolen_phone: 40
+    order_physical_card: 40
+    passcode_forgotten: 40
+    pending_card_payment: 40
+    pending_cash_withdrawal: 40
+    pending_top_up: 40
+    pending_transfer: 40
+    pin_blocked: 40
+    receiving_money: 40
+    request_refund: 40
+    reverted_card_payment?: 40
+    supported_cards_and_currencies: 40
+    terminate_account: 40
+    top_up_by_bank_transfer_charge: 40
+    top_up_by_card_charge: 40
+    top_up_by_cash_or_cheque: 40
+    top_up_failed: 40
+    top_up_limits: 40
+    top_up_reverted: 40
+    topping_up_by_card: 40
+    transaction_charged_twice: 40
+    transfer_fee_charged: 40
+    transfer_into_account: 40
+    transfer_not_received_by_recipient: 40
+    transfer_timing: 40
+    unable_to_verify_identity: 40
+    verify_my_identity: 40
+    verify_source_of_funds: 40
+    verify_top_up: 40
+    virtual_card_not_working: 40
+    visa_or_mastercard: 40
+    why_verify_identity: 40
+    wrong_amount_of_cash_received: 40
+    wrong_exchange_rate_for_cash_withdrawal: 40
+  cert_counts:
+    Refund_not_showing_up: 157
+    activate_my_card: 154
+    age_limit: 110
+    apple_pay_or_google_pay: 121
+    atm_support: 87
+    automatic_top_up: 122
+    balance_not_updated_after_bank_transfer: 166
+    balance_not_updated_after_cheque_or_cash_deposit: 176
+    beneficiary_not_allowed: 151
+    cancel_transfer: 152
+    card_about_to_expire: 124
+    card_acceptance: 59
+    card_arrival: 148
+    card_delivery_estimate: 112
+    card_linking: 134
+    card_not_working: 112
+    card_payment_fee_charged: 182
+    card_payment_not_recognised: 163
+    card_payment_wrong_exchange_rate: 162
+    card_swallowed: 61
+    cash_withdrawal_charge: 172
+    cash_withdrawal_not_recognised: 155
+    change_pin: 117
+    compromised_card: 86
+    contactless_not_working: 40
+    country_support: 124
+    declined_card_payment: 148
+    declined_cash_withdrawal: 168
+    declined_transfer: 128
+    direct_debit_payment_not_recognised: 177
+    disposable_card_limits: 116
+    edit_personal_details: 116
+    exchange_charge: 116
+    exchange_rate: 112
+    exchange_via_app: 113
+    extra_charge_on_statement: 161
+    failed_transfer: 132
+    fiat_currency_support: 121
+    get_disposable_virtual_card: 97
+    get_physical_card: 106
+    getting_spare_card: 124
+    getting_virtual_card: 98
+    lost_or_stolen_card: 82
+    lost_or_stolen_phone: 116
+    order_physical_card: 115
+    passcode_forgotten: 105
+    pending_card_payment: 154
+    pending_cash_withdrawal: 138
+    pending_top_up: 144
+    pending_transfer: 143
+    pin_blocked: 115
+    receiving_money: 95
+    request_refund: 164
+    reverted_card_payment?: 156
+    supported_cards_and_currencies: 124
+    terminate_account: 108
+    top_up_by_bank_transfer_charge: 111
+    top_up_by_card_charge: 114
+    top_up_by_cash_or_cheque: 114
+    top_up_failed: 140
+    top_up_limits: 97
+    top_up_reverted: 141
+    topping_up_by_card: 103
+    transaction_charged_twice: 170
+    transfer_fee_charged: 167
+    transfer_into_account: 113
+    transfer_not_received_by_recipient: 166
+    transfer_timing: 123
+    unable_to_verify_identity: 102
+    verify_my_identity: 104
+    verify_source_of_funds: 113
+    verify_top_up: 121
+    virtual_card_not_working: 41
+    visa_or_mastercard: 130
+    why_verify_identity: 116
+    wrong_amount_of_cash_received: 175
+    wrong_exchange_rate_for_cash_withdrawal: 158
+  delta_w: 0.005
+  delta_s: 0.015
+  power:
+    D-A1: 0.9125
+    D-B1: 0.9125
+    D-J: 0.9125
+    D-O: 0.9125
+    D-X: 0.9125
+  dev_discordance:
+    llm:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-A1:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-B1:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-J:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-O:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-X:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+  slices:
+  - cards
+  - card_payments
+  - cash
+  - transfers
+  - top_ups
+  - account_other
+  - out_of_scope
+  seeds:
+    bootstrap: 20261021
+    reasoning: 20261021
+    power: 20261021
+  code_version: src tree bb82167c21baa59dc1095573671bdde94edbe40f, analysis tree 884e88e42c8f7b0fbfebdb3f44a5511f2dd9fb06
+  budget:
+    planned_cert_runs:
+    - inc
+    - luna-none
+    - aa
+    - luna-dec
+    - luna-none-x
+    - haiku55-off
+    - jev-c51
+    drop_order:
+    - luna-R
+    - haiku55-R
+    - luna-none-x
+    - luna-dec
+    - aa
+    not_run:
+      D-A2: no dev gain
+      D-B2: no dev gain
+  selections:
+    reasoning:
+      luna: null
+      haiku55: null
+    jev_design: jev-c51
+    dx_iteration: 3
+    dx_prompt_sha256: 8b0ffa521ce81eb8d74d86450482fde4a05ef8a3864a3ceafd5fc45781840fb5
+    records:
+      competence:
+        items: 2000
+        baseline_accuracy: 0.796
+        incumbent_accuracy: 0.8415
+      dev_runs:
+        inc: inc-dev-20261022T101627Z
+        jev-c51: jev-c51-dev-20261022T103933Z
+        jev-noul: jev-noul-dev-20261022T104717Z
+        luna-dec: luna-dec-dev-20261022T103933Z
+        luna-none: luna-none-dev-20261022T104814Z
+        haiku55-off: haiku55-off-dev-20261022T104814Z
+        luna-low: luna-low-dev-20261022T110623Z
+        luna-medium: luna-medium-dev-20261022T115342Z
+        haiku55-low: haiku55-low-dev-20261022T110812Z
+        haiku55-medium: haiku55-medium-dev-20261022T112709Z
+        luna-none-x: luna-none-x-dev-20261022T114622Z
+      api_errors_left_out:
+        inc: 0
+        jev-c51: 0
+        jev-noul: 0
+        luna-dec: 0
+        luna-none: 0
+        haiku55-off: 0
+        luna-low: 0
+        luna-medium: 0
+        haiku55-low: 0
+        haiku55-medium: 0
+        luna-none-x: 0
+      reasoning:
+        luna:
+          qualified: []
+          selected_level: null
+          config: null
+          comparisons:
+            low_vs_none:
+              qualifies: false
+              difference_pp: -0.1676
+              bootstrap_p10_pp: -0.2682
+              sign_p: 1.0
+              n10: 0
+              n01: 5
+              n: 3075
+              dropped: 0
+              tau_inc: 0.95
+              tau_x: 1.0
+              tau_y: 1.0
+              seed:
+              - 20261021
+              - 81
+              - 0
+              - 0
+              incumbent_unreachable_resamples: 0
+            medium_vs_none:
+              qualifies: false
+              difference_pp: -0.2567
+              bootstrap_p10_pp: -0.3723
+              sign_p: 1.0
+              n10: 0
+              n01: 8
+              n: 3075
+              dropped: 0
+              tau_inc: 0.95
+              tau_x: 1.0
+              tau_y: 1.0
+              seed:
+              - 20261021
+              - 81
+              - 0
+              - 1
+              incumbent_unreachable_resamples: 0
+        haiku55:
+          qualified: []
+          selected_level: null
+          config: null
+          comparisons:
+            low_vs_none:
+              qualifies: false
+              difference_pp: 0.2324
+              bootstrap_p10_pp: -0.0551
+              sign_p: 0.180189
+              n10: 25
+              n01: 18
+              n: 3075
+              dropped: 0
+              tau_inc: 0.95
+              tau_x: 0.96
+              tau_y: 0.97
+              seed:
+              - 20261021
+              - 81
+              - 1
+              - 0
+              incumbent_unreachable_resamples: 0
+            medium_vs_none:
+              qualifies: false
+              difference_pp: 0.2078
+              bootstrap_p10_pp: -0.1143
+              sign_p: 0.23544
+              n10: 27
+              n01: 21
+              n: 3075
+              dropped: 0
+              tau_inc: 0.95
+              tau_x: 0.96
+              tau_y: 0.97
+              seed:
+              - 20261021
+              - 81
+              - 1
+              - 1
+              incumbent_unreachable_resamples: 0
+      jev:
+        jev-c51:
+          tau: 1.01
+          dev_a: 0.0
+        jev-noul:
+          tau: 1.01
+          dev_a: 0.0
+      dx_iterations:
+      - iteration: 0
+        prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+        changed_lines: 0
+        run_id: luna-none-dev-20261022T104814Z
+        tau: 1.0
+        dev_w: 0.0
+        dev_a: 0.003161508505841361
+      - iteration: 1
+        prompt_sha256: bda960c59a08eedc3c21f3eb84b4f1e822b072da2ad170b9be64f9b605cbf8a8
+        changed_lines: 19
+        run_id: luna-none-x-dev-20261022T112237Z
+        tau: 1.0
+        dev_w: 0.0
+        dev_a: 0.0005943840951014552
+      - iteration: 2
+        prompt_sha256: ec98b5143a0440793f36698947bd92bd7831ed5432b97a47e81ba4ad11eb5e77
+        changed_lines: 21
+        run_id: luna-none-x-dev-20261022T113521Z
+        tau: 1.01
+        dev_w: 0.0
+        dev_a: 0.0
+      - iteration: 3
+        prompt_sha256: 8b0ffa521ce81eb8d74d86450482fde4a05ef8a3864a3ceafd5fc45781840fb5
+        changed_lines: 21
+        run_id: luna-none-x-dev-20261022T114622Z
+        tau: 1.0
+        dev_w: 0.0
+        dev_a: 0.1364034638245542
+      budget:
+        spent_usd:
+          openai: 2.4708
+          anthropic: 0.8271
+          typesafe: 1.135
+        dev_p90_item_usd:
+          inc: 0.0002553
+          jev-c51: 0.00014595
+          jev-noul: 0.00020126
+          luna-dec: 0.0002327
+          luna-none: 4.058e-05
+          haiku55-off: 6.168e-05
+          luna-low: 6.188e-05
+          luna-medium: 0.00011018
+          haiku55-low: 0.00015359
+          haiku55-medium: 0.00017359
+          luna-none-x: 4.365e-05
+        projected_usd:
+          openai: 8.8409
+          anthropic: 1.429
+          typesafe: 2.5592
+        substitutions: []
+        dropped: []
+        warnings: []
+      margins:
+        joint_power: 0.9125
+        reached_target: true
+        sims: 4000
+  order_sensitivity:
+    jev-c51:
+      changed: 6
+      items: 100
+    jev-noul:
+      changed: 4
+      items: 100
+    luna-dec:
+      changed: 14
+      items: 100
+  policy:
+    inc:
+      tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    jev-c51:
+      tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    luna-dec:
+      tau: 0.99
+      dev_w: 0.01670094867215179
+      dev_a: 0.25072431411589025
+    luna-none:
+      tau: 0.99
+      dev_w: 0.011444455831112933
+      dev_a: 0.3454601352736216
+    haiku55-off:
+      tau: 0.9
+      dev_w: 0.014772494363599098
+      dev_a: 0.3346843615494978
+    luna-none-x:
+      tau: 0.99
+      dev_w: 0.014424062307849969
+      dev_a: 0.4246310719409715

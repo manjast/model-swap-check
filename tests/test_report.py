@@ -55,6 +55,7 @@ def contract() -> Contract:
                     "records": {},
                 },
                 "order_sensitivity": {},
+                "policy": {},
             }
         ),
     )
@@ -185,20 +186,32 @@ def test_interface_power_files_separate_and_noul_eligible(tmp_path: Path, monkey
     assert not (tmp_path / "dropped.D-O.json").exists()
 
 
-def test_dx_uses_only_the_frozen_iteration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(("iteration", "selected_run"), [(2, "dx-2"), (0, "none")])
+def test_dx_uses_only_the_frozen_iteration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, iteration: int, selected_run: str
+) -> None:
+    """Iteration 0 is the incumbent prompt: its dev run is luna-none's, and no luna-none-x run counts."""
     frozen = contract()
     assert frozen.analysis is not None
     frozen.analysis.budget.planned_cert_runs[:] = ["inc", "luna-none-x"]
     frozen.analysis.configurations["luna-none-x"] = Calibration(tau=0.9, dev_w=0, dev_a=0)
-    selections = frozen.analysis.selections.model_copy(update={"dx_prompt_sha256": "iteration-2"})
+    selections = frozen.analysis.selections.model_copy(
+        update={"dx_iteration": iteration, "dx_prompt_sha256": "incumbent" if iteration == 0 else "iteration-2"}
+    )
     frozen = frozen.model_copy(update={"analysis": frozen.analysis.model_copy(update={"selections": selections})})
-    runs = {"inc": "incumbent", "dx-1": "iteration-1", "dx-2": "iteration-2", "dx-3": "iteration-3"}
+    runs = {
+        "inc": "incumbent",
+        "none": "incumbent",
+        "dx-1": "iteration-1",
+        "dx-2": "iteration-2",
+        "dx-3": "iteration-3",
+    }
     for name in runs:
         (tmp_path / name).mkdir()
         (tmp_path / name / "run.json").write_text("{}", encoding="utf-8")
 
     def metadata(directory: Path) -> SimpleNamespace:
-        config_id = "inc" if directory.name == "inc" else "luna-none-x"
+        config_id = {"inc": "inc", "none": "luna-none"}.get(directory.name, "luna-none-x")
         return SimpleNamespace(
             split="dev",
             config_id=config_id,
@@ -208,8 +221,8 @@ def test_dx_uses_only_the_frozen_iteration(tmp_path: Path, monkeypatch: pytest.M
         )
 
     def rows(directory: Path) -> list[ItemRow]:
-        # The incumbent is always right; iteration 2 alone misroutes the two `cards` items to `b`.
-        wrong_cards = directory.name == "dx-2"
+        # The incumbent is always right; the selected iteration alone misroutes the two `cards` items to `b`.
+        wrong_cards = directory.name == selected_run
         return [
             ItemRow(
                 item_id=item.item_id,

@@ -74,6 +74,7 @@ class AnalysisContract(BaseModel):
     budget: BudgetPlan
     selections: SelectionRecords
     order_sensitivity: dict[str, OrderSensitivity]  # decision-interface configuration ID -> pilot measurement
+    policy: dict[str, Calibration]  # §7.8 (amendment 1): each configuration's own tau at weighted dev W <= 2%
 
 
 class Contract(BaseModel):

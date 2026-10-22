@@ -22,8 +22,10 @@ anthropic:
   tokens: 400000
 
 typesafe:
-  # No rate-limit header is returned and the docs point to the console; not yet read from it.
-  # The pilot ran these values with no 429.
+  # Console (read by Stefan, 2026-10-22): 80 requests and 100,000 input tokens per second; no header exists.
+  # 80%: 64 requests and 80,000 TypeSafe tokens per second. The estimate (o200k of the developer message
+  # + text, about 2,350) undercounts TypeSafe's own count (pilot max 4,796 for jev-noul) by a factor
+  # up to 2.04, so the token limit is stated in estimate units: 80,000 / 2.04 = 39,000.
   per: second
-  requests: 5
-  tokens: 20000
+  requests: 64
+  tokens: 39000

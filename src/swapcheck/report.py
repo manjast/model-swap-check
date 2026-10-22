@@ -43,10 +43,11 @@ def worst_dev_discordance(
     selected = planned_llm_configs(contract, load_configurations() if configs is None else configs)
     if not selected:
         raise ValueError("final cert plan has no LLM candidates")
-    return _discordance(runs, contract, selected)
+    return discordance(runs, contract, selected)
 
 
-def _discordance(runs: Mapping[str, AnalysisRun], contract: Contract, selected: Sequence[str]) -> dict[str, float]:
+def discordance(runs: Mapping[str, AnalysisRun], contract: Contract, selected: Sequence[str]) -> dict[str, float]:
+    """Per-slice dev discordance of `selected` against `inc`, the maximum over them, floored at 1%."""
     analysis = contract.analysis
     if analysis is None:
         raise ValueError("contract has no analysis plan")
@@ -87,7 +88,7 @@ def interface_dev_discordance(
     if contract.analysis is None:
         raise ValueError("contract has no analysis plan")
     return {
-        "D-J" if configurations[cid].provider == "typesafe" else "D-O": _discordance(runs, contract, [cid])
+        "D-J" if configurations[cid].provider == "typesafe" else "D-O": discordance(runs, contract, [cid])
         for cid in contract.analysis.budget.planned_cert_runs
         if cid != "aa" and configurations[cid].is_decision_interface  # `aa` is `inc` on the A/A split
     }
@@ -107,12 +108,15 @@ def write_pdisc(
     if contract.analysis is None:
         raise ValueError("contract has no analysis plan")
     required = {"inc", *(cid for cid in contract.analysis.budget.planned_cert_runs if cid != "aa")}
+    # Every D-X iteration is a `luna-none-x` dev run; only the frozen selection counts (§8.3). Iteration 0 is the
+    # incumbent prompt, whose dev run is `luna-none`'s.
+    dx_is_luna_none = "luna-none-x" in required and contract.analysis.selections.dx_iteration == 0
+    wanted = required - {"luna-none-x"} | {"luna-none"} if dx_is_luna_none else required
     runs: dict[str, AnalysisRun] = {}
     for meta_path in sorted(runs_dir.glob("*/run.json")):
         meta = read_meta(meta_path.parent)
-        if meta.split != "dev" or meta.config_id not in required:
+        if meta.split != "dev" or meta.config_id not in wanted:
             continue
-        # Every D-X iteration is a `luna-none-x` dev run; only the frozen selection counts (§8.3).
         if meta.config_id == "luna-none-x" and meta.prompt_sha256 != contract.analysis.selections.dx_prompt_sha256:
             continue
         if meta.config_id in runs:
@@ -125,6 +129,8 @@ def write_pdisc(
         runs[meta.config_id] = build_run(
             items, rows, split="dev", groups=groups, noul=configurations[meta.config_id].jev_design == "noul"
         )
+    if dx_is_luna_none and "luna-none" in runs:
+        runs["luna-none-x"] = runs["luna-none"]
     missing = required - runs.keys()
     if missing:
         raise ValueError(f"missing dev runs: {sorted(missing)}")

@@ -9,11 +9,12 @@ Your LLM classifier has to move. OpenAI removes `gpt-4o-mini` from its API on 20
 
 Every model is scored against ground-truth labels on the same messages. Reasoning effort and request design are selected on development data. Acceptance rules are frozen before the test runs, and every decision can be replayed from the recorded responses.
 
-**Status:** M3 done: the analysis is implemented and replayed on fixtures, and a $0.20 pilot on 100 development messages confirmed every configuration, its cost and its rate limits. No development or test run yet.
+**Status:** M4 done: all 13 development runs are in, the incumbent passed its competence check and the acceptance contract is frozen in `contracts/contract-v1.yaml`. The incumbent's stated confidence turned out to support the registered 2% risk limit only at 1.83% automation, so spec amendment 1 added a descriptive analysis at that limit before any candidate was run. No test-set (`cert`) run yet.
 
 - [Specification](docs/spec.md)
 - [Test plan](docs/test-plan.md)
 - [Pilot results](docs/pilot.md), reproduced by `python analysis/pilot.py`
+- [Development runs and contract freeze](docs/dev.md), reproduced by `python analysis/dev.py freeze`
 - [Power analysis](analysis/power.py): how often the acceptance rules certify an equally good candidate
 - [Incumbent prompt](prompts/incumbent-v1.md), its [Jev translation](prompts/jev-v1.yaml) and its [Decisions API translation](prompts/decisions-v1.yaml)
 

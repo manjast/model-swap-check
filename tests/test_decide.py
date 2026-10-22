@@ -9,15 +9,17 @@ import numpy as np
 import pytest
 from test_golden import build_golden, load_golden
 
-from swapcheck.contract import AnalysisContract
+from swapcheck.contract import AnalysisContract, Calibration
 from swapcheck.decide import (
     DECISIONS,
     FAMILY_CONFIDENCE,
     DecisionRefusal,
+    _g3_limitation,
     _noise,
     evaluate,
     naive_swap,
     operational_flags,
+    policy_analysis,
     verdict,
     write_decisions,
 )
@@ -253,6 +255,46 @@ def test_naive_swap_hand_count_at_incumbent_threshold(analysis: AnalysisContract
     assert "100.00 pp" in lines
     none = "\n".join(naive_swap(run, 1.01, analysis.slices))
     assert "| overall | 210 | 0.00 pp" in none
+
+
+def test_v4_policy_analysis_hand_values_limitation_and_verdicts_unchanged(
+    tmp_path: Path, analysis: AnalysisContract
+) -> None:
+    inc_policy = Calibration(tau=0.95, dev_w=0.0, dev_a=0.0183)
+    a = analysis.model_copy(
+        update={"policy": {"inc": inc_policy, "luna-none": Calibration(tau=0.5, dev_w=0.02, dev_a=0.9)}}
+    )
+    # Every confidence is 0.9: the incumbent at 0.95 auto-routes nothing, the candidate at 0.5 everything.
+    text = "\n".join(policy_analysis(arm(a, n=210), arm(a, n=210, wrong=21), a, "luna-none"))
+    assert "| candidate | overall | 210 | 10.00 pp [6.63 pp, 14.80 pp] | 100.00 pp [98.20 pp, 100.00 pp] |" in text
+    assert "| incumbent | overall | 210 | 0.00 pp [0.00 pp, 1.80 pp] | 0.00 pp [0.00 pp, 1.80 pp] |" in text
+    # One-sided upper Wilson bound at zero errors: (z^2/n) / (1 + z^2/n) with z = 1.645, n = 210.
+    assert "incumbent: one-sided 95% upper Wilson bound of W = 1.27 pp: below 2%." in text
+    assert "candidate: one-sided 95% upper Wilson bound of W = 13.93 pp: not below 2%." in text
+    assert "A difference (candidate minus incumbent) = 100.00 pp" in text
+
+    assert _g3_limitation(analysis) == []  # golden incumbent: dev A 80%
+    configurations = analysis.configurations | {"inc": inc_policy}
+    (line,) = _g3_limitation(analysis.model_copy(update={"configurations": configurations}))
+    assert "dev A at τ_inc is 1.83 pp, below the 3.00 pp G3 margin" in line
+    assert "dev W of 0.00 pp" in line
+
+    build_golden(tmp_path / "fixture")
+    runs, contract, items, groups = load_golden(tmp_path / "fixture")
+    assert contract.analysis is not None
+    moved = {cid: c.model_copy(update={"tau": 1.01}) for cid, c in contract.analysis.policy.items()}
+    one = write_decisions(runs, contract, items, groups, tmp_path / "one")
+    other = contract.model_copy(update={"analysis": contract.analysis.model_copy(update={"policy": moved})})
+    two = write_decisions(runs, other, items, groups, tmp_path / "two")
+    for decision, record in one.items():
+        assert record.split("\n## ")[0] == two[decision].split("\n## ")[0]  # header with the verdict
+        if "**Verdict: NOT RUN**" not in record:
+            assert record != two[decision]
+    low = contract.analysis.configurations | {"inc": inc_policy}
+    limited = contract.model_copy(update={"analysis": contract.analysis.model_copy(update={"configurations": low})})
+    records = write_decisions(runs, limited, items, groups, tmp_path / "limited")
+    assert all("Limitation (§7.8)" in record for record in records.values())  # NOT RUN records too
+    assert not any("Limitation (§7.8)" in record for record in one.values())
 
 
 def test_operational_flags_and_reported_tokens_never_change_rendered_verdict(tmp_path: Path) -> None:
