@@ -1,0 +1,217 @@
+tag: synthetic-golden-v1
+configurations:
+  inc:
+    config_sha256: 893a381edcd1582691563a216717a0a2c2d4b50c4ee3e4beabba23ea8d8dfee8
+    prompt_sha256: 26caa17f99a806ff9051f75a8b07c8bc266ec9ccb692d955c5ee4508d37a8c07
+    schema_sha256: b9e2a5464d75dad045a2d3f3e94e17296bf1428b40c02160677d8890dad4765b
+  luna-none:
+    config_sha256: 12b1c30bb3dd9335cdd7c9bf984841d82e815f8e1423657c89d545c2fae6ef35
+    prompt_sha256: 71723b19023a87fbd0f353b3c8292e49736b2df36e969e99751e1cb46a8ac1d4
+    schema_sha256: 35fad3c74c5625ea72593136e1489209b7d282c4597bf5c685c737ebb04c1f97
+  luna-low:
+    config_sha256: c1605379d77d65ca9e391d7e8e36f32122b3242508e4aff9c0175a9a21dfabc1
+    prompt_sha256: ac5ecbc0298065715e778eb1e3b09c2792863821a477ab2cfe82f384206007e1
+    schema_sha256: fe13d748879b4fb911c45605c0bda98abe641b4700887dbe60e300ecde66d051
+  luna-medium:
+    config_sha256: 0b208e75627d21eccd45e861897b9d9094adc455a597a25579d0d22fe21b695c
+    prompt_sha256: 295195c3baefe43819411684fd2ba1041025f1f440fec683236e738d0de55dc9
+    schema_sha256: 51f8cd3260b049de6b4935485241ca4fbc7b04bf64250b3b9877e043e8acfc40
+  haiku55-off:
+    config_sha256: e5ae7bdfba20a30faf03761e6fb5021efe06eaa59678bd3188c95d9a520db014
+    prompt_sha256: b4a8177ae28788c71c4fe4ee9273c968cb09f3fe940ed35d1560e44cd7b294f8
+    schema_sha256: e45799b8182968be19a68b0b35b48fe65ecd5fbc2617c421ca41b180fb2a09c1
+  haiku55-low:
+    config_sha256: 7513ff9f60e1d2d6ffdff01e6396015fd705e52119b108bfa03ff35cd287d180
+    prompt_sha256: 85d42254b0bc770c543560f1f9a614a5febf64775290edd089405fde1a0b8dfc
+    schema_sha256: d160dcf487e38b3921f7c511bfd7f767533728d8ec290b2b83fb767dff0572ae
+  haiku55-medium:
+    config_sha256: 7032b95643d8e9e9f0eb5baa48ee62e404b73ebd9a9e6d148637183448addae7
+    prompt_sha256: 193d9c4cdf2255893740f6dec9ce893d7ac4f652431fc795f34471e8600efa11
+    schema_sha256: 3cea3040a30e1daa66c490c07f9eae6b81202406023def3381309846d0402dd3
+  jev-c51:
+    config_sha256: 8600d2c7dfd20fbcb0c5c1bcee4ffd5cb106cebfd10525052535e8f3f3d71dc1
+    prompt_sha256: 5b72a5e8a10447700c8e154671227ddbd4b6b2f8620135509896b36c9411ca64
+    schema_sha256: b6b01ac51d2afe645860eb93add9d60c8a4af3246760bffba28fb84a809bcfb7
+  jev-noul:
+    config_sha256: e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b
+    prompt_sha256: 8a58a0016640113aab5d9fc57f0b93edfe72eaf35190e4f552fc81d1d4ee0d04
+    schema_sha256: de263b2fad144e6c061e5f4afee6d34bbc7123015b2e56b5c0e12f7343855f40
+  luna-none-x:
+    config_sha256: ba3a1eea371f9d8641ce90e37d264e9a9137ee30ce8e507c7324017520154c81
+    prompt_sha256: 3195759f33a9c5a3d5c533d4029c4b45553a13d9b073c544ed83faabdf9bba26
+    schema_sha256: c4c922704bee06ef9ec33d6ef88ebc328c43589e8eae05afaf544c62971be2a1
+  luna-dec:
+    config_sha256: 7d35f91149329f4aa8ec042c60140722318d9d7d4f37ac944aab1cd3695f73ad
+    prompt_sha256: 0a7a2d019361de1ab87304808ea94bcde2a468951412eb4b3b71a068879e7fee
+    schema_sha256: dc6d3b64e0d4a3936098c3e6cb5843ff826e411283eec77566724016e2795565
+item_lists:
+  cert: 985045187a6cde95b6974139aa64fd82591b77355638a9499ebd26da6942eca1
+  dev: 7f6e0d76e62d3c91e2e4b1c615cda55990b27395c68898d02e56bc1ab5104a20
+  aa: 985045187a6cde95b6974139aa64fd82591b77355638a9499ebd26da6942eca1
+analysis:
+  incumbent_tau: 0.7
+  configurations:
+    inc:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-none:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-low:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-medium:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    haiku55-off:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    haiku55-low:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    haiku55-medium:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    jev-c51:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    jev-noul:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-none-x:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+    luna-dec:
+      tau: 0.7
+      dev_w: 0.0
+      dev_a: 0.8
+  dev_counts:
+    activate_my_card: 10
+    card_payment_fee_charged: 10
+    cash_withdrawal_charge: 10
+    balance_not_updated_after_bank_transfer: 10
+    automatic_top_up: 10
+    Refund_not_showing_up: 10
+    age_limit: 10
+  cert_counts:
+    activate_my_card: 30
+    card_payment_fee_charged: 30
+    cash_withdrawal_charge: 30
+    balance_not_updated_after_bank_transfer: 30
+    automatic_top_up: 30
+    Refund_not_showing_up: 30
+    age_limit: 30
+  delta_w: 0.01
+  delta_s: 0.03
+  power:
+    D-A1: 0.65
+    D-A2: 0.65
+    D-B1: 0.65
+    D-B2: 0.65
+    D-J: 0.65
+    D-O: 0.65
+    D-X: 0.65
+  dev_discordance:
+    D-A1:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-A2:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-B1:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-B2:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-J:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-O:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+    D-X:
+      cards: 0.01
+      card_payments: 0.01
+      cash: 0.01
+      transfers: 0.01
+      top_ups: 0.01
+      account_other: 0.01
+      out_of_scope: 0.01
+  slices:
+  - cards
+  - card_payments
+  - cash
+  - transfers
+  - top_ups
+  - account_other
+  - out_of_scope
+  seeds:
+    bootstrap: 20261021
+    power: 20261021
+  code_version: synthetic-golden-v1
+  budget:
+    planned_cert_runs:
+    - inc
+    - luna-none
+    - haiku55-off
+    - jev-noul
+    - luna-dec
+    - aa
+    drop_order:
+    - D-X
+    - D-B2
+    not_run:
+      D-A2: no dev gain
+      D-B2: budget
+      D-X: budget
+  selections:
+    reasoning:
+      luna: null
+      haiku55: haiku55-low
+    jev_design: jev-noul
+    dx_iteration: 0
+    dx_prompt_sha256: 3195759f33a9c5a3d5c533d4029c4b45553a13d9b073c544ed83faabdf9bba26
+    records:
+      fixture: Synthetic data only; no real model claims.
+      discordance: Assumed 1% planning floor per slice, not estimated from dev.

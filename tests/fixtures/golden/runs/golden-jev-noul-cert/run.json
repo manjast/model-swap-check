@@ -1,0 +1,42 @@
+{
+  "complete": true,
+  "config_id": "jev-noul",
+  "config_sha256": "e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b",
+  "contract_tag_commit": "0123456789abcdef0123456789abcdef01234567",
+  "ended_at": "2026-10-21T12:01:00+00:00",
+  "git_commit": "0123456789abcdef0123456789abcdef01234567",
+  "incomplete_reason": null,
+  "item_list_sha256": "985045187a6cde95b6974139aa64fd82591b77355638a9499ebd26da6942eca1",
+  "prompt_sha256": "8a58a0016640113aab5d9fc57f0b93edfe72eaf35190e4f552fc81d1d4ee0d04",
+  "requested_model": "jev-1.13.0",
+  "retry_errors_in_progress": false,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "returned_model_ids": [
+    "jev-1.13.0"
+  ],
+  "run_id": "golden-jev-noul-cert",
+  "schema_sha256": "de263b2fad144e6c061e5f4afee6d34bbc7123015b2e56b5c0e12f7343855f40",
+  "split": "cert",
+  "started_at": "2026-10-21T12:00:00+00:00",
+  "totals": {
+    "billed_usd": 0.01,
+    "by_status": {
+      "ok": 210
+    },
+    "case_normalized": 0,
+    "n_429": 0,
+    "tokens": {
+      "cache_read": 94500,
+      "cache_write": 0,
+      "output": 2520,
+      "reasoning": null,
+      "uncached_input": 31500
+    }
+  },
+  "versions": {
+    "python": "3.13",
+    "swapcheck": "0.1.0"
+  },
+  "warmups": []
+}

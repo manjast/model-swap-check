@@ -69,7 +69,7 @@ def _draw_discordant(n: int, p_disc: float, delta: float, rng: random.Random) ->
 def tango_score(n10: int, n01: int, n: int, delta: float) -> float:
     """Tango score statistic for H0: P(only candidate wrong) - P(only incumbent wrong) = delta."""
     w = -n10 - n01 + (2 * n - n10 + n01) * delta
-    q = (math.sqrt(max(w * w + 8 * n * n01 * delta * (1 + delta), 0.0)) - w) / (4 * n)
+    q = (math.sqrt(max(w * w + 8 * n * n01 * delta * (1 - delta), 0.0)) - w) / (4 * n)
     var = n * (2 * q + delta * (1 - delta))
     diff = n10 - n01 - n * delta
     if var <= 0:

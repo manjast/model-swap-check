@@ -211,16 +211,16 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 - **Release errors:** each verdict is a single intersection–union test at α = 5% one-sided. G1–G3 all have to pass, so no correction is needed within a decision.
 - **Harm side:** corrected over the 7 slices (G2 FAIL rule).
 - **Family-adjusted status:** each decision record also reports the gates at U and L for one-sided 1 − 0.05/7 (Bonferroni over the 7 decisions). This answers "is any of the options safe?", which is the question a reader picking the best option implicitly asks. Decisions not run do not reduce the divisor.
-- **Noise floor rule:** if the A/A comparison (§7.6) is FAIL on G1 or G2, every verdict becomes INCONCLUSIVE with that reason.
+- **Noise floor rule:** if the A/A comparison (§7.6) is FAIL on G1 or G2, every verdict becomes INCONCLUSIVE with that reason. NOT RUN decisions stay NOT RUN.
 - **Cost and latency** are reported, not gated (deployment assumption, §1). Two flags never change the verdict: `COST` if steady-traffic cost > 1.5× the incumbent's, `LATENCY` if p95 > 2× the incumbent's. Reasoning/thinking tokens per message are reported next to latency as a speed measure that does not depend on our network.
 
 ### 7.3 Margins *(M4)*
 
 - **Grid:** δ_W ∈ {0.50, 0.75, 1.00} pp; δ_S ∈ {1.5, 2.0, 2.5, 3.0} pp. Business meaning: 0.5 pp = 5 more misrouted messages per 1,000.
-- **Input:** `swapcheck report --pdisc-json` writes, per slice, the worst `dev` discordance across the LLM candidate configurations in the final `cert` plan, taken after the §9.5 budget plan, each at its τ. Discordance is the share where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%. The two decision interfaces (Jev and `luna-dec`) are excluded from this input, so a structurally different output cannot loosen every LLM decision's margins; D-J and D-O use the same margins (one business tolerance for every candidate) and each record states its own power at them, computed the same way from its `dev` discordance.
+- **Input:** `swapcheck report --pdisc-json PATH` writes, per slice, the worst `dev` discordance across the LLM candidate configurations in the final `cert` plan, taken after the §9.5 budget plan, each at its τ. Discordance is the unweighted share, after dropping items that are `api_error` in either arm, where exactly one of candidate and incumbent is `wrong_auto`. Values are floored at 1%. The two decision interfaces (Jev and `luna-dec`) are excluded from this input, so a structurally different output cannot loosen every LLM decision's margins; D-J and D-O use the same margins (one business tolerance for every candidate) and each record states its own power at them, computed the same way from its `dev` discordance (written next to PATH as `<stem>.D-J.json` and `<stem>.D-O.json` when planned).
 - **Selection:** `analysis/power.py --pdisc-json` simulates G1 + G2 with the same Tango bound and the calibration noise of §6. It selects the first pair, ordered by δ_W then δ_S, whose joint power for an equally good candidate is ≥ 80%.
 - **Fallback:** if none reaches 80%, use (1.00, 3.0) and write the power into the contract.
-- **Planning estimate:** with assumed discordance 3–8% (doubled for OOS), joint power at (1.00, 3.0) is 66–95% (`python analysis/power.py`).
+- **Planning estimate:** with assumed discordance 3–8% (doubled for OOS), joint power at (1.00, 3.0) is 65–95% (`python analysis/power.py`).
 
 ### 7.4 Statistics
 
@@ -231,12 +231,13 @@ Bounds are one-sided Tango (1998) score bounds for a difference of paired propor
 - **Sample size needed:**
   - G1/G2: n = ⌈p̂·(z₀.₉₅ + z₀.₈₀)² / (δ − d̂)²⌉ when d̂ < δ.
   - G3: n = ⌈p̂_A·(z₀.₉₅ + z₀.₈₀)² / (d̂ + δ_A)²⌉ when d̂ > −δ_A, with p̂_A the automation discordance.
-  - Otherwise: "not reachable at this point estimate".
+  - Otherwise: "not reachable at this point estimate"; with no discordant pairs (p̂ = 0, where the formula gives 0): "no discordant pairs observed".
+- **Decision indices** (bootstrap seeds, record order): 1–7 = D-A1, D-A2, D-B1, D-B2, D-J, D-O, D-X, as in §1; gate_index 1–3 = G1–G3. G4 has no bound and is not resampled.
 - **Output format:** decision files are rounded to 0.01 pp and contain no wall-clock fields.
 
 ### 7.5 Naive-swap analysis (descriptive)
 
-Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes. D-J and D-O report "not applicable": their confidence comes from a decision interface on a different scale, and moving to either is not a model-ID swap.
+Each LLM candidate is also scored at `τ_inc`: unweighted estimates and two-sided 95% Wilson score intervals for W and A, overall and per slice. No verdict. This shows what happens when only the model ID changes. D-J and D-O report "not applicable": their confidence comes from a decision interface on a different scale, and moving to either is not a model-ID swap.
 
 ### 7.6 Noise floor
 
@@ -248,12 +249,13 @@ Each LLM candidate is also scored at `τ_inc`: estimates and two-sided 95% inter
 
 - **Contents of `contracts/contract-v1.yaml`:**
   - configurations, with hashes of prompt and schema;
-  - τ values and the weighted `dev` W values;
-  - the weights;
-  - margins and the power behind them;
+  - τ values and the weighted `dev` W and A values;
+  - the weights, as the `dev` and `cert` intent counts they are computed from;
+  - margins, the `dev` discordance behind them and the power per decision;
+  - the §8 selection records (reasoning level per vendor, Jev design, D-X iteration and prompt hash);
   - slices and seeds;
   - the analysis code version;
-  - the budget drop order (§9.5).
+  - the budget plan: planned `cert` runs, drop order and NOT RUN decisions with reasons (§9.5).
 - **Timing:** committed and tagged `contract-v1` before the first `cert` call.
 - **Changes:** any change after that is a new contract version with a written reason, never an edit.
 
@@ -269,7 +271,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 **Gain test.** X *really gains* over Y iff both hold:
 
-- **Recalibrating bootstrap:** in each of 2,000 resamples, draw `dev` items with replacement within each intent; recompute `τ_inc`, `τ_X` and `τ_Y` by §6 on the resample; compute d̄* = weighted A_X − weighted A_Y. The 10th percentile of d̄* (`numpy.quantile`, `method="lower"`) must be > 0. RNG: `numpy.random.default_rng(SeedSequence([20261021, 81, vendor_index, comparison_index]))`.
+- **Recalibrating bootstrap:** in each of 2,000 resamples, draw `dev` items with replacement within each intent; recompute `τ_inc`, `τ_X` and `τ_Y` by §6 on the resample; compute d̄* = weighted A_X − weighted A_Y. The 10th percentile of d̄* (`numpy.quantile`, `method="lower"`) must be > 0. RNG: `numpy.random.default_rng(SeedSequence([20261021, 81, vendor_index, comparison_index]))`, with vendor_index 0 = OpenAI, 1 = Anthropic and comparison_index 0 = `low` vs `none/off`, 1 = `medium` vs `none/off`, 2 = `medium` vs `low`. Threshold comparisons are exact (integer weights scaled by the least common multiple of the `dev` intent counts). A resample in which `τ_inc` is unreachable does not void the experiment: there the incumbent takes τ = 1.01 (weighted W = 0), the candidates are matched to that, and the number of such resamples is logged.
 - **Small-count guard:** an exact one-sided sign test on the unweighted discordant counts (X auto-routed and Y not, vs the reverse) gives p < 0.10. This stops a gain resting on a handful of items, for example when Y ends with τ = 1.01 and auto-routes nothing.
 
 **Selection**, with `none/off` the no-reasoning configuration:
@@ -392,7 +394,7 @@ The pilot replaces the reasoning-token assumptions with measured values before a
 ## 12. Repository and workflow
 
 - **Language and packaging:** Python ≥ 3.12, `pyproject.toml` with pinned dependencies (`httpx`, `numpy`, `pyyaml`, `pydantic`, `tiktoken`; dev: `pytest`, `ruff`, `mypy`). The four APIs (OpenAI Responses and Decisions, Anthropic Messages, TypeSafe System One) are called over plain HTTP, not through vendor SDKs: one retry policy for all providers (SDKs retry on their own), request bodies that tests can snapshot exactly, and raw response JSON for the records.
-- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run`, `decide`, `report`.
+- **CLI:** `swapcheck`, with subcommands `data`, `prompt` (prompt size and hash; generates the Jev and Decisions translations, `--check` in CI), `run`, `decide` (`--runs-dir`, `--contract`, `--output-dir`; writes `decisions/*.md`, exits non-zero listing the problems when it refuses), `report` (`--pdisc-json PATH` for §7.3).
 - **CI on every PR:** ruff, mypy, pytest, gitleaks, and golden replay of committed decisions.
 - **Workflow:** one PR per milestone, squash-merged, with branches deleted after merge. Secrets live only in `.env` (git-ignored).
 

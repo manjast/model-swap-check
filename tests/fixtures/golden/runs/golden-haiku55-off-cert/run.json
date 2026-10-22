@@ -1,0 +1,42 @@
+{
+  "complete": true,
+  "config_id": "haiku55-off",
+  "config_sha256": "e5ae7bdfba20a30faf03761e6fb5021efe06eaa59678bd3188c95d9a520db014",
+  "contract_tag_commit": "0123456789abcdef0123456789abcdef01234567",
+  "ended_at": "2026-10-21T12:01:00+00:00",
+  "git_commit": "0123456789abcdef0123456789abcdef01234567",
+  "incomplete_reason": null,
+  "item_list_sha256": "985045187a6cde95b6974139aa64fd82591b77355638a9499ebd26da6942eca1",
+  "prompt_sha256": "b4a8177ae28788c71c4fe4ee9273c968cb09f3fe940ed35d1560e44cd7b294f8",
+  "requested_model": "claude-haiku-5-5",
+  "retry_errors_in_progress": false,
+  "retry_errors_passes": 0,
+  "retry_errors_rewritten": 0,
+  "returned_model_ids": [
+    "claude-haiku-5-5"
+  ],
+  "run_id": "golden-haiku55-off-cert",
+  "schema_sha256": "e45799b8182968be19a68b0b35b48fe65ecd5fbc2617c421ca41b180fb2a09c1",
+  "split": "cert",
+  "started_at": "2026-10-21T12:00:00+00:00",
+  "totals": {
+    "billed_usd": 0.01,
+    "by_status": {
+      "ok": 210
+    },
+    "case_normalized": 0,
+    "n_429": 0,
+    "tokens": {
+      "cache_read": 94500,
+      "cache_write": 0,
+      "output": 2520,
+      "reasoning": null,
+      "uncached_input": 31500
+    }
+  },
+  "versions": {
+    "python": "3.13",
+    "swapcheck": "0.1.0"
+  },
+  "warmups": []
+}

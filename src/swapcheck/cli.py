@@ -156,6 +156,33 @@ def cmd_run(args: argparse.Namespace) -> int:
     return asyncio.run(go())
 
 
+def cmd_decide(args: argparse.Namespace) -> int:
+    """Replay frozen certification evidence into decision records."""
+    from swapcheck.contract import load_contract
+    from swapcheck.decide import DecisionRefusal, write_decisions
+
+    contract = load_contract(args.contract)
+    groups = load_groups()
+    items = data.load_splits(groups)
+    try:
+        write_decisions(args.runs_dir, contract, items["cert"], groups, args.output_dir)
+    except DecisionRefusal as exc:
+        print(str(exc))
+        return 2
+    return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    """Write measured dev discordance for margin selection."""
+    from swapcheck.contract import load_contract
+    from swapcheck.report import write_pdisc
+
+    contract = load_contract(args.contract)
+    groups = load_groups()
+    write_pdisc(args.runs_dir, contract, data.load_splits(groups)["dev"], groups, args.pdisc_json)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="swapcheck")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -170,6 +197,16 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--retry-errors", metavar="RUN_ID", help="the single API-error retry pass of a finished run")
     p_run.add_argument("--ceiling-usd", type=float, help="absolute provider spend at which this run stops")
     p_run.set_defaults(func=cmd_run)
+    p_decide = sub.add_parser("decide", help="replay certification evidence into frozen decision records")
+    p_decide.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
+    p_decide.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")
+    p_decide.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
+    p_decide.set_defaults(func=cmd_decide)
+    p_report = sub.add_parser("report", help="write final-plan own-threshold dev discordance")
+    p_report.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
+    p_report.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")
+    p_report.add_argument("--pdisc-json", type=Path, required=True, metavar="PATH")
+    p_report.set_defaults(func=cmd_report)
     args = parser.parse_args(argv)
     result: int = args.func(args)
     return result
