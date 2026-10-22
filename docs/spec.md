@@ -275,7 +275,7 @@ Each LLM candidate is also scored at `τ_inc`: unweighted estimates and two-side
   - **J1:** `jev-c51` at τ = 1.00, its top confidence, whatever its `dev` W.
   - **J2:** `jev-noul` with the signal s = the Noul match probability when the Choice confidence is 1.00, else 0. It routes by §3.3 with s in place of the confidence (the 0.5 Noul gate still applies). `τ_J2` is the smallest τ ∈ {0} ∪ {s of every `ok`, non-`out_of_scope` `dev` prediction} with weighted `dev` W ≤ 2.0% (1.01 if none), which is the §6 incumbent rule applied to s.
 - **Contract.** `contracts/contract-v2.yaml`, tagged `contract-v2` before the `jev-noul` `cert` run, freezes both rules with their weighted `dev` W and A, the incumbent's `τ_inc` from `contract-v1`, and the hashes of `inc`, `jev-c51` and `jev-noul`. Those of `inc` and `jev-c51` must equal `contract-v1`'s.
-- **Runs.** One `jev-noul` `cert` run under `contract-v2`. J1 and the incumbent reuse their `contract-v1` `cert` runs. Stefan raised the TypeSafe cap from $5 to $6 for this run.
+- **Runs.** One `jev-noul` `cert` run under `contract-v2`. J1 and the incumbent reuse their `contract-v1` `cert` runs. The TypeSafe cap was raised from $5 to $6 for this run.
 - **Reported on `cert`** in `decisions/A2-jev.md` (written by `swapcheck jev-policy`, replayed by CI), for J1 and J2 as in §7.8: W and A overall and per slice with two-sided 95% Wilson score intervals; whether the one-sided 95% upper Wilson bound of overall W is below 2%; and the paired A difference against the incumbent at `τ_inc` (`api_error` items in either arm dropped) with one-sided 95% Tango bounds. No verdict. D-J stays as registered.
 
 ### 7.10 Risk-limit sensitivity (amendment 3, descriptive)
@@ -360,7 +360,7 @@ All three selections use weighted `dev` metrics at each configuration's own τ (
 
 ### 9.5 Budget and freeze guards
 
-- **Caps:** `config/budget.yaml` caps OpenAI at $15 (raised from $10 when D-O was added), Anthropic at $10 and TypeSafe at $6 (Stefan's TypeSafe budget; raised from $5 by amendment 2).
+- **Caps:** `config/budget.yaml` caps OpenAI at $15 (raised from $10 when D-O was added), Anthropic at $10 and TypeSafe at $6 (raised from $5 by amendment 2).
 - **Spent:** the cost of every attempt and warm-up across all run records, following provider billing (an Anthropic refusal before any output in an unbilled category — `cyber`, `general_harms` or none — costs $0; its reported counts are kept in `raw_output`). An attempt that timed out is charged as full uncached input plus max output tokens; "full input" is the whole request body the adapter sends, in `o200k_base` tokens, times a safety factor (1.0 OpenAI, 1.35 Anthropic and TypeSafe, for their own tokenizers and Claude's injected structured-output prompt; the pilot checks it).
 - **Admission:** every HTTP attempt, including retries and warm-ups, starts only if spent + the reservations of attempts in flight + its own reservation stays within the run's ceiling, and is charged when it ends. A reservation is the full-input estimate at the provider's highest input price (cache write where it is dearer) plus max output tokens.
 - **Pre-`dev` gate (after the pilot):** spent + every planned `dev` run + the mandatory `cert` runs (`inc`, `luna-none`, `aa` for OpenAI; `haiku55-off` for Anthropic), each × per-item p90 cost from the pilot, must stay ≤ cap − $0.50. If not, the `*-medium` `dev` run of that vendor is skipped, then `*-low`. Each `dev` run gets a spend ceiling that keeps the mandatory `cert` reserve; reaching it stops the run as incomplete without affecting later runs.
@@ -452,7 +452,7 @@ Every plan fits its cap − $0.50, `medium` included. Measured reasoning/thinkin
 | M4 dev and freeze | §3.4 passed; τ, reasoning levels (§8.1), Jev design (§8.2), D-X (§8.3), margins and budget plan set by the stated rules; `contract-v1` tagged |
 | M5 certification | planned `cert` and `aa` runs valid (§9.2); `runs/manifest.yaml` written; decision records generated; CI replay reproduces them |
 | M6 write-up | README case study, `WALKTHROUGH.md` (reading path and likely interview questions), site case-study draft and post drafts ready for review |
-| M7 publication | Stefan's review done; gitleaks over the full history clean; repository public |
+| M7 publication | publication review complete; gitleaks over the full history clean; repository public |
 
 ## 14. Open items
 
