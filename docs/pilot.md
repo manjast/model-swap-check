@@ -19,7 +19,7 @@
 | T-L2 | Met. After the warm-up, 100/100 calls read the cache for every Luna and Haiku 5.5 configuration (≥ 90% expected). `inc` (implicit, best effort): 98/100. |
 | T-L3 | Measured. The explicit mode is kept for `cert` (see Cache). |
 | T-L4 | Met. The cost model and pre-`dev` gate are computed from the pilot (see Cost and budget). Spec §11's planning table is updated. |
-| T-L5 | Met. The TypeSafe account limit, which no header reports, was read from its console by Stefan (see Rate limits). |
+| T-L5 | Met. The TypeSafe account limit, which no header reports, was read from its console (see Rate limits). |
 | T-L6 | Met. Ten real responses are in `tests/fixtures/responses/pilot-*.json` and drive T-R2, including one `jev-c51`, one `jev-noul` and one `luna-dec` response, plus two warm-ups with cache writes. Each keeps its request ID. Headers are limited to request IDs, rate limits, timing and content type. gitleaks is clean. |
 | T-L7 | Met (see Latency). |
 | T-L8 | Met. `jev-c51` 6%, `jev-noul` 4%, `luna-dec` 14% (see Option order). |
