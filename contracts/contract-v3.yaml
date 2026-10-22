@@ -1,0 +1,188 @@
+# Written by `python analysis/dev.py freeze-v3` (spec §7.10, amendment 3). A change is a new version.
+tag: contract-v3
+configurations:
+  inc:
+    config_sha256: 893a381edcd1582691563a216717a0a2c2d4b50c4ee3e4beabba23ea8d8dfee8
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-none:
+    config_sha256: 12b1c30bb3dd9335cdd7c9bf984841d82e815f8e1423657c89d545c2fae6ef35
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-none-x:
+    config_sha256: ba3a1eea371f9d8641ce90e37d264e9a9137ee30ce8e507c7324017520154c81
+    prompt_sha256: 8b0ffa521ce81eb8d74d86450482fde4a05ef8a3864a3ceafd5fc45781840fb5
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  haiku55-off:
+    config_sha256: e5ae7bdfba20a30faf03761e6fb5021efe06eaa59678bd3188c95d9a520db014
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  luna-dec:
+    config_sha256: 7d35f91149329f4aa8ec042c60140722318d9d7d4f37ac944aab1cd3695f73ad
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 97ff4d951a4a3c1bc8bd387b908c2ba5520f6f579aa87859eb6bb12c3c8e501e
+  jev-c51:
+    config_sha256: 8600d2c7dfd20fbcb0c5c1bcee4ffd5cb106cebfd10525052535e8f3f3d71dc1
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 51573188cdf90926278ee812292c9aad781e955c9628721a0b12b5b7d6d16be0
+  jev-noul:
+    config_sha256: e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 50ad902ab1ddb39bdc5242b5009f0e0d61985699a41669bd4a1b8d05c2551da8
+item_lists:
+  cert: 5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b
+analysis: null
+jev_policy: null
+risk_limits:
+  limits:
+  - 0.01
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.15
+  run_contracts:
+    inc: contract-v1
+    luna-none: contract-v1
+    luna-none-x: contract-v1
+    haiku55-off: contract-v1
+    luna-dec: contract-v1
+    jev-c51: contract-v1
+    jev-noul: contract-v2
+  thresholds:
+    inc:
+    - tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    - tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    - tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    - tau: 0.95
+      dev_w: 0.0
+      dev_a: 0.01830805492928879
+    - tau: 0.9
+      dev_w: 0.14338088894094222
+      dev_a: 0.7183091529294645
+    luna-none:
+    - tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.003161508505841361
+    - tau: 0.99
+      dev_w: 0.011444455831112933
+      dev_a: 0.3454601352736216
+    - tau: 0.94
+      dev_w: 0.03968502034960326
+      dev_a: 0.5024412203905952
+    - tau: 0.94
+      dev_w: 0.03968502034960326
+      dev_a: 0.5024412203905952
+    - tau: 0.78
+      dev_w: 0.1364265218282435
+      dev_a: 0.7181159048985448
+    luna-none-x:
+    - tau: 1.0
+      dev_w: 0.0
+      dev_a: 0.1364034638245542
+    - tau: 0.99
+      dev_w: 0.014424062307849969
+      dev_a: 0.4246310719409715
+    - tau: 0.99
+      dev_w: 0.014424062307849969
+      dev_a: 0.4246310719409715
+    - tau: 0.78
+      dev_w: 0.07835548853687817
+      dev_a: 0.6360107457617193
+    - tau: 0.0
+      dev_w: 0.12240945158551225
+      dev_a: 0.7301620648259304
+    haiku55-off:
+    - tau: 0.92
+      dev_w: 0.005574912891986063
+      dev_a: 0.2025158844025415
+    - tau: 0.9
+      dev_w: 0.014772494363599098
+      dev_a: 0.3346843615494978
+    - tau: 0.82
+      dev_w: 0.027635566421690627
+      dev_a: 0.46965749714519955
+    - tau: 0.62
+      dev_w: 0.07655147424823588
+      dev_a: 0.6343117734898838
+    - tau: 0.62
+      dev_w: 0.07655147424823588
+      dev_a: 0.6343117734898838
+    luna-dec:
+    - tau: 1.0
+      dev_w: 0.008726173396187743
+      dev_a: 0.14963619594179134
+    - tau: 0.99
+      dev_w: 0.01670094867215179
+      dev_a: 0.25072431411589025
+    - tau: 0.87
+      dev_w: 0.049523467923754866
+      dev_a: 0.478333162533306
+    - tau: 0.55
+      dev_w: 0.09929654788744766
+      dev_a: 0.6312267589962814
+    - tau: 0.0
+      dev_w: 0.14421463707434193
+      dev_a: 0.7102092056334729
+    jev-c51:
+    - tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    - tau: 1.01
+      dev_w: 0.0
+      dev_a: 0.0
+    - tau: 0.97
+      dev_w: 0.045089011214241796
+      dev_a: 0.5380921880947501
+    - tau: 0.82
+      dev_w: 0.09616358738617398
+      dev_a: 0.6712891254062601
+    - tau: 0.61
+      dev_w: 0.14724914355986296
+      dev_a: 0.7557139929142389
+    jev-noul:
+    - tau: 0.99
+      dev_w: 0.006174420987907358
+      dev_a: 0.1525158844025415
+    - tau: 0.94
+      dev_w: 0.01875054900008784
+      dev_a: 0.40593286094925773
+    - tau: 0.13
+      dev_w: 0.038893362222937954
+      dev_a: 0.46872017099522734
+    - tau: 0.13
+      dev_w: 0.038893362222937954
+      dev_a: 0.46872017099522734
+    - tau: 0.13
+      dev_w: 0.038893362222937954
+      dev_a: 0.46872017099522734
+  incumbent_fixed:
+  - tau: 0.0
+    dev_w: 0.2676437648230024
+    dev_a: 0.8820601411296226
+  - tau: 0.9
+    dev_w: 0.14338088894094222
+    dev_a: 0.7183091529294645
+  code_version: src tree 9f28c9586fea87f72dd401fe1afc14e4cf20efff, analysis tree d1ad64f511c1b492f1d665d154329a681536a515
+  records:
+    dev_runs:
+      inc: inc-dev-20261022T101627Z
+      luna-none: luna-none-dev-20261022T104814Z
+      luna-none-x: luna-none-x-dev-20261022T114622Z
+      haiku55-off: haiku55-off-dev-20261022T104814Z
+      luna-dec: luna-dec-dev-20261022T103933Z
+      jev-c51: jev-c51-dev-20261022T103933Z
+      jev-noul: jev-noul-dev-20261022T104717Z
+    api_errors_left_out:
+      inc: 0
+      luna-none: 0
+      luna-none-x: 0
+      haiku55-off: 0
+      luna-dec: 0
+      jev-c51: 0
+      jev-noul: 0
