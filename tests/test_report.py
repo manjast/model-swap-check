@@ -55,6 +55,7 @@ def contract() -> Contract:
                     "records": {},
                 },
                 "order_sensitivity": {},
+                "policy": {},
             }
         ),
     )

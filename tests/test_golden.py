@@ -178,6 +178,13 @@ def build_golden(root: Path) -> None:
                     "jev-noul": {"changed": 5, "items": 100},
                     "luna-dec": {"changed": 14, "items": 100},
                 },
+                # §7.8: the incumbent's tau_2% is tau_inc; the candidates' own 2% thresholds sit lower.
+                "policy": {
+                    key: {"tau": 0.7, "dev_w": 0.0, "dev_a": 0.8}
+                    if key == "inc"
+                    else {"tau": 0.5, "dev_w": 0.02, "dev_a": 0.85}
+                    for key in configs
+                },
             },
         }
     )

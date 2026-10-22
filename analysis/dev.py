@@ -60,6 +60,7 @@ from swapcheck.selection import (
 
 SEED = 20261021  # §7.3 power and §7.4 bootstrap; §8.1 adds its own indices to it
 POWER_SIMS = 4000
+POLICY_LIMIT = Fraction(1, 50)  # §7.8, the registered 2% limit
 REQUIRED = ("jev-c51", "jev-noul", "luna-dec", "luna-none", "haiku55-off")
 LEVELS = ("luna-low", "luna-medium", "haiku55-low", "haiku55-medium")
 VENDORS: tuple[tuple[Vendor, str, budget_mod.Vendor], ...] = (
@@ -148,6 +149,13 @@ def fit_inc(inputs: Inputs, inc: DevRun) -> Calibration:
 def fit(inputs: Inputs, candidate: DevRun, incumbent: Calibration) -> Calibration:
     run = usable(candidate.run)
     return fit_candidate(run, dev_weights(run.truth, inputs.dev_counts, inputs.cert_counts), incumbent.wrong)
+
+
+def fit_policy(inputs: Inputs, run: DevRun) -> Calibration:
+    """Spec §7.8: the configuration's own smallest tau with weighted dev W <= 2% (1.01 if none)."""
+    usable_run = usable(run.run)
+    weights = dev_weights(usable_run.truth, inputs.dev_counts, inputs.cert_counts)
+    return fit_candidate(usable_run, weights, POLICY_LIMIT)
 
 
 def pct(value: Fraction | float) -> str:
@@ -455,6 +463,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             cid: OrderSensitivity(changed=changed, items=items)
             for cid, (changed, items) in order_changes(latest_pilot_runs(inputs.runs_dir)).items()
         },
+        policy={
+            cid: frozen(fit_policy(inputs, r))
+            for cid, r in dev_runs.items()
+            if cid in {planned.config_id for planned in plan.runs}
+        },
     )
     contract = Contract(
         tag=CONTRACT_TAG,
@@ -524,6 +537,9 @@ def summary(a: AnalysisContract, check: CompetenceCheck) -> str:
         yaml.safe_dump(rec["budget"], sort_keys=False),
         f"§7.3 margins: delta_W {a.delta_w * 100:.2f} pp, delta_S {a.delta_s * 100:.1f} pp; {rec['margins']}",
         "power per decision: " + ", ".join(f"{d} {v:.3f}" for d, v in a.power.items()),
+        "",
+        "§7.8 policy thresholds, own weighted dev W <= 2% (%):",
+        table(("config", "tau", "W", "A"), [(cid, c.tau, pct(c.dev_w), pct(c.dev_a)) for cid, c in a.policy.items()]),
         "",
         "dev discordance (%):",
         table(("set", *a.slices), [(k, *(pct(v[s]) for s in a.slices)) for k, v in a.dev_discordance.items()]),
