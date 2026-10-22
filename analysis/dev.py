@@ -8,6 +8,7 @@ Usage:
     python analysis/dev.py dx-errors RUN_ID  # D-X input: error counts by (truth, answer) at the run's own tau
     python analysis/dev.py dx-use N          # check prompts/dx/iteration-N.md and make it prompts/luna-none-x.md
     python analysis/dev.py freeze            # selections, budget plan and margins -> contracts/contract-v1.yaml
+    python analysis/dev.py freeze-v2         # amendment 2 (§7.9): Jev rules J1 and J2 -> contracts/contract-v2.yaml
 """
 
 from __future__ import annotations
@@ -33,10 +34,12 @@ from swapcheck.calibrate import Calibration, VoidExperiment, fit_candidate, fit_
 from swapcheck.configs import Configuration, load_configurations
 from swapcheck.contract import (
     CONTRACT_PATH,
+    CONTRACT_V2_PATH,
     AnalysisContract,
     BudgetPlan,
     Contract,
     ContractConfiguration,
+    JevPolicy,
     OrderSensitivity,
     SelectionRecords,
     load_contract,
@@ -44,6 +47,7 @@ from swapcheck.contract import (
 from swapcheck.contract import Calibration as FrozenCalibration
 from swapcheck.freeze import CONTRACT_TAG
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, IntentGroups, load_groups
+from swapcheck.jev_policy import TOP, fit_j2
 from swapcheck.outcomes import AnalysisRun, build_run, dev_weights, weighted_rates
 from swapcheck.records import ItemRow, RunMeta, read_meta, read_rows
 from swapcheck.report import discordance, write_pdisc
@@ -535,6 +539,80 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     return 0
 
 
+CONTRACT_V2_TAG = "contract-v2"
+
+
+def cmd_freeze_v2(args: argparse.Namespace) -> int:
+    """Spec §7.9 (amendment 2): J1 and J2 from the Jev dev runs, against contract-v1, into contract-v2."""
+    clean_code(("src", "analysis", "config"))
+    inputs = load(args.runs_dir)
+    base = load_contract(CONTRACT_PATH)
+    if base.analysis is None:
+        raise SystemExit(f"{CONTRACT_PATH.name} has no analysis")
+    c51, noul = require(inputs, "jev-c51"), require(inputs, "jev-noul")
+    configs = frozen_configurations(inputs.configs)
+    for r in (c51, noul):
+        expected = configs[r.meta.config_id]
+        if (r.meta.config_sha256, r.meta.prompt_sha256, r.meta.schema_sha256) != (
+            expected.config_sha256,
+            expected.prompt_sha256,
+            expected.schema_sha256,
+        ):
+            raise SystemExit(f"{r.meta.config_id}: dev run {r.meta.run_id} was not made with the current configuration")
+    for cid in ("inc", "jev-c51"):
+        if configs[cid] != base.configurations[cid]:
+            raise SystemExit(f"{cid}: the configuration differs from {base.tag}, whose cert run J1 reuses")
+
+    c51_run = usable(c51.run)
+    j1 = weighted_rates(c51_run, TOP, dev_weights(c51_run.truth, inputs.dev_counts, inputs.cert_counts))
+    j2 = fit_j2(inputs.splits["dev"], noul.rows, inputs.groups, inputs.dev_counts, inputs.cert_counts)
+
+    prices = cost.load_prices()
+    p90 = cost.cost_model(inputs.configs["jev-noul"], noul.rows, noul.meta.warmups, prices).item_p90_usd
+    spent = cost.spent_usd(inputs.runs_dir, prices, inputs.configs)["typesafe"]
+    projected = spent + budget_mod.SPLIT_SIZES["cert"] * p90
+    limit = budget_mod.load_budget().limit("typesafe")
+    if projected > limit:
+        raise SystemExit(f"the jev-noul cert run does not fit: projected ${projected:.4f} > ${limit:.2f}")
+
+    policy = JevPolicy(
+        base_tag=base.tag,
+        incumbent_tau=base.analysis.incumbent_tau,
+        j1=FrozenCalibration(tau=TOP, dev_w=float(j1.wrong), dev_a=float(j1.automation)),
+        j2=frozen(j2),
+        code_version=code_version(),
+        records={
+            "dev_runs": {"jev-c51": c51.meta.run_id, "jev-noul": noul.meta.run_id},
+            "api_errors_left_out": {
+                "jev-c51": c51.run.status.count("api_error"),
+                "jev-noul": noul.run.status.count("api_error"),
+            },
+            "budget": {
+                "typesafe_spent_usd": round(spent, 4),
+                "jev_noul_dev_p90_item_usd": round(p90, 8),
+                "typesafe_projected_usd": round(projected, 4),
+                "typesafe_limit_usd": limit,
+            },
+        },
+    )
+    contract = Contract(
+        tag=CONTRACT_V2_TAG,
+        configurations={cid: configs[cid] for cid in ("inc", "jev-c51", "jev-noul")},
+        item_lists={"cert": data.item_list_hash(inputs.splits["cert"])},
+        jev_policy=policy,
+    )
+    header = "# Written by `python analysis/dev.py freeze-v2` (spec §7.9, amendment 2). A change is a new version.\n"
+    CONTRACT_V2_PATH.write_text(
+        header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    if load_contract(CONTRACT_V2_PATH) != contract:
+        raise SystemExit("the written contract does not read back unchanged")
+    print(f"wrote {CONTRACT_V2_PATH.relative_to(REPO_ROOT)}\n")
+    print(yaml.safe_dump(policy.model_dump(mode="json"), sort_keys=False, allow_unicode=True))
+    return 0
+
+
 def summary(a: AnalysisContract, check: CompetenceCheck) -> str:
     rec = a.selections.records
     lines = [
@@ -584,6 +662,8 @@ def main() -> int:
     p_freeze = sub.add_parser("freeze")
     p_freeze.add_argument("--pdisc-json", type=Path, default=REPO_ROOT / "scratch" / "dev-pdisc.json")
     p_freeze.set_defaults(func=cmd_freeze)
+    p_freeze_v2 = sub.add_parser("freeze-v2")
+    p_freeze_v2.set_defaults(func=cmd_freeze_v2)
     args = ap.parse_args()
     result: int = args.func(args)
     return result

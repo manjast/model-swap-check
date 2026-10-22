@@ -163,7 +163,7 @@ POLICY_LIMIT = 0.02
 def policy_analysis(inc: AnalysisRun, cand: AnalysisRun, a: AnalysisContract, cfg: str) -> list[str]:
     """Spec §7.8 (amendment 1): both arms at their own dev-fitted tau for weighted W <= 2%; never a verdict."""
     ti, tc = a.policy["inc"], a.policy[cfg]
-    lines = [
+    return [
         "## Policy analysis at the 2% limit (§7.8, amendment 1)",
         "",
         "Descriptive; it never changes the verdict. Each arm runs at its own τ fitted on dev to weighted W ≤ 2%: "
@@ -171,20 +171,30 @@ def policy_analysis(inc: AnalysisRun, cand: AnalysisRun, a: AnalysisContract, cf
         f"candidate τ_2% = {tc.tau:.2f} (dev W {pp(tc.dev_w)}, A {pp(tc.dev_a)}). "
         "Unweighted cert estimates on the paired items, two-sided 95% Wilson score intervals.",
         "",
+        *policy_comparison(inc, ti.tau, cand, tc.tau, a.slices),
+    ]
+
+
+def policy_comparison(
+    inc: AnalysisRun, tau_inc: float, cand: AnalysisRun, tau_cand: float, slices: Sequence[str]
+) -> list[str]:
+    """Paired arms at fixed thresholds (§7.8, §7.9): W and A per scope, the one-sided bound on W against 2%, and
+    the A difference with its Tango bounds."""
+    lines = [
         "| Arm | Scope | n | W [95% CI] | A [95% CI] |",
         "|---|---|---:|---|---|",
-        *_rate_rows(inc, ti.tau, a.slices, "incumbent"),
-        *_rate_rows(cand, tc.tau, a.slices, "candidate"),
+        *_rate_rows(inc, tau_inc, slices, "incumbent"),
+        *_rate_rows(cand, tau_cand, slices, "candidate"),
         "",
     ]
     z = NormalDist().inv_cdf(0.95)
-    for arm, run, tau in (("incumbent", inc, ti.tau), ("candidate", cand, tc.tau)):
+    for arm, run, tau in (("incumbent", inc, tau_inc), ("candidate", cand, tau_cand)):
         wrong = int(np.count_nonzero(run.auto_mask(tau) & ~run.correct))
         upper = _wilson_bounds(wrong, len(run), z)[1] if len(run) else None
         held = "undefined" if upper is None else f"{pp(upper)}: {'below' if upper < POLICY_LIMIT else 'not below'} 2%"
         lines.append(f"- {arm}: one-sided 95% upper Wilson bound of W = {held}.")
     if len(cand):
-        b = gate_g3(*counts(cand.auto_mask(tc.tau), inc.auto_mask(ti.tau))).bounds
+        b = gate_g3(*counts(cand.auto_mask(tau_cand), inc.auto_mask(tau_inc))).bounds
         lines.append(
             f"- A difference (candidate minus incumbent) = {pp(b.estimate)}; one-sided 95% Tango bounds "
             f"[{pp(b.lower)}, {pp(b.upper)}]."

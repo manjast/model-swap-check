@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from swapcheck import data, prompt
+from swapcheck.freeze import CONTRACT_TAG
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, load_groups
 
 # Request-ID headers of the three providers, plus the content type; nothing account-identifying.
@@ -89,7 +90,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise SystemExit(f"{cfg.id} is a pilot-only variant")
     runs_dir = REPO_ROOT / "runs"
     if args.split in GUARDED_SPLITS and not args.retry_errors:
-        commit = tag_commit(REPO_ROOT)
+        commit = tag_commit(REPO_ROOT, args.contract_tag)
         if commit is not None and cfg.provider in budget_mod.stopped_providers(runs_dir, configs, commit):
             raise SystemExit(
                 f"{cfg.provider} had an in-run budget stop under this contract tag; no later run starts (spec §9.5)"
@@ -158,6 +159,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     reservation_fn=reservation_fn,
                     token_estimate_fn=estimate,
                     budget=budget,
+                    contract_tag=args.contract_tag,
                 )
             else:
                 meta = await runner.run(
@@ -174,6 +176,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     token_estimate_fn=estimate,
                     budget=budget,
                     run_id=args.run_id,
+                    contract_tag=args.contract_tag,
                 )
         ok, why = runner.run_validity(meta, read_rows(runs_dir / meta.run_id))
         print(f"run {meta.run_id}: {meta.totals.by_status}, billed ${meta.totals.billed_usd:.4f}")
@@ -193,6 +196,29 @@ def cmd_decide(args: argparse.Namespace) -> int:
     items = data.load_splits(groups)
     try:
         write_decisions(args.runs_dir, contract, items["cert"], groups, args.output_dir)
+    except DecisionRefusal as exc:
+        print(str(exc))
+        return 2
+    return 0
+
+
+def cmd_jev_policy(args: argparse.Namespace) -> int:
+    """Replay the amendment 2 Jev report (spec §7.9)."""
+    from swapcheck.contract import load_contract
+    from swapcheck.decide import DecisionRefusal
+    from swapcheck.jev_policy import write_jev_policy
+
+    groups = load_groups()
+    items = data.load_splits(groups)["cert"]
+    try:
+        write_jev_policy(
+            args.runs_dir,
+            load_contract(args.base_contract),
+            load_contract(args.contract),
+            items,
+            groups,
+            args.output_dir,
+        )
     except DecisionRefusal as exc:
         print(str(exc))
         return 2
@@ -224,12 +250,21 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--retry-errors", metavar="RUN_ID", help="the single API-error retry pass of a finished run")
     p_run.add_argument("--ceiling-usd", type=float, help="absolute provider spend at which this run stops")
     p_run.add_argument("--capture-dir", type=Path, help="also save every 2xx response here (pilot fixtures, T-L6)")
+    p_run.add_argument(
+        "--contract-tag", default=CONTRACT_TAG, help="contract a cert/aa run is frozen under (spec §7.9: contract-v2)"
+    )
     p_run.set_defaults(func=cmd_run)
     p_decide = sub.add_parser("decide", help="replay certification evidence into frozen decision records")
     p_decide.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
     p_decide.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")
     p_decide.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
     p_decide.set_defaults(func=cmd_decide)
+    p_jev = sub.add_parser("jev-policy", help="replay the amendment 2 Jev report (spec §7.9)")
+    p_jev.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
+    p_jev.add_argument("--base-contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")
+    p_jev.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v2.yaml")
+    p_jev.add_argument("--output-dir", type=Path, default=REPO_ROOT / "decisions")
+    p_jev.set_defaults(func=cmd_jev_policy)
     p_report = sub.add_parser("report", help="write final-plan own-threshold dev discordance")
     p_report.add_argument("--runs-dir", type=Path, default=REPO_ROOT / "runs")
     p_report.add_argument("--contract", type=Path, default=REPO_ROOT / "contracts" / "contract-v1.yaml")

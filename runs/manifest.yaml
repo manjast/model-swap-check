@@ -62,6 +62,15 @@ runs:
   prompt_sha256: 8b0ffa521ce81eb8d74d86450482fde4a05ef8a3864a3ceafd5fc45781840fb5
   schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
   item_list_sha256: 5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b
+- contract_tag: contract-v2
+  contract_tag_commit: 3ee1db7f29902d7217e7716577ab7f7486a7b50f
+  config_id: jev-noul
+  split: cert
+  run_id: jev-noul-cert-20261022T152203Z
+  config_sha256: e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b
+  prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+  schema_sha256: 50ad902ab1ddb39bdc5242b5009f0e0d61985699a41669bd4a1b8d05c2551da8
+  item_list_sha256: 5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b
 not_run:
 - contract_tag: contract-v1
   decision_id: D-A2

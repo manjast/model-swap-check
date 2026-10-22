@@ -1,0 +1,42 @@
+# Written by `python analysis/dev.py freeze-v2` (spec §7.9, amendment 2). A change is a new version.
+tag: contract-v2
+configurations:
+  inc:
+    config_sha256: 893a381edcd1582691563a216717a0a2c2d4b50c4ee3e4beabba23ea8d8dfee8
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 1523a743d88d7bdfcc25bc181ae914d03fd576314657f3468ec59d806f4d1719
+  jev-c51:
+    config_sha256: 8600d2c7dfd20fbcb0c5c1bcee4ffd5cb106cebfd10525052535e8f3f3d71dc1
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 51573188cdf90926278ee812292c9aad781e955c9628721a0b12b5b7d6d16be0
+  jev-noul:
+    config_sha256: e0d2f45425c293be08210c117c163ffd8a3b657b837b5d37db5b72d6ac74979b
+    prompt_sha256: 40fe6b0a03cb532836986d3d2fc684d71f0606bbbfa38650a84c150f862f980a
+    schema_sha256: 50ad902ab1ddb39bdc5242b5009f0e0d61985699a41669bd4a1b8d05c2551da8
+item_lists:
+  cert: 5aa55fc5003e23828b8d6018b5255afb3f6502be6ae7decb4f900ee5fd89b91b
+analysis: null
+jev_policy:
+  base_tag: contract-v1
+  incumbent_tau: 0.95
+  j1:
+    tau: 1.0
+    dev_w: 0.022867683658829387
+    dev_a: 0.42375413580066174
+  j2:
+    tau: 0.94
+    dev_w: 0.01875054900008784
+    dev_a: 0.40593286094925773
+  code_version: src tree ea01a607f0610f9eb5139afb198db9fe0c101cbc, analysis tree afc55185ad38d92295a52ebf5228478c8493e713
+  records:
+    dev_runs:
+      jev-c51: jev-c51-dev-20261022T103933Z
+      jev-noul: jev-noul-dev-20261022T104717Z
+    api_errors_left_out:
+      jev-c51: 0
+      jev-noul: 0
+    budget:
+      typesafe_spent_usd: 2.5565
+      jev_noul_dev_p90_item_usd: 0.00020126
+      typesafe_projected_usd: 4.5204
+      typesafe_limit_usd: 5.5

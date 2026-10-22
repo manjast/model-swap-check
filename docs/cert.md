@@ -51,6 +51,21 @@ Each arm at its own τ_2% from `dev`; unweighted `cert` estimates with two-sided
 
 Every LLM candidate stays under the 2% limit on `cert` while automating 25–43% of traffic, against 2% for the incumbent. `jev-c51` automates nothing: its confidence saturates at 1.00, where its `dev` W was already 2.29%.
 
+## Amendment 2: Jev at its top confidence (§7.9, descriptive)
+
+Jev's 0% above comes from how it reports confidence, not from how it routes. On `dev` its in-scope top-1 accuracy is 85.6% (incumbent 84.2%). TypeSafe computes the confidence as (p_max − 1/n)/(1 − 1/n) from probabilities rounded to 0.01, so 38% of its `dev` answers share the top value, 1.00. At 1.00 its weighted `dev` W is 2.29%, and the next threshold up automates nothing.
+
+- **Timeline:** the amendment text was committed and pushed at 15:04 UTC (`58f0a20`), before any `cert` estimate of the two rules. `contract-v2` was tagged at `3ee1db7` after an independent review. That review re-derived τ_J2 = 0.94 from the `dev` runs. The tag is on the branch commit, which the tag keeps reachable after the squash merge.
+- **Run:** one `jev-noul` `cert` run, `jev-noul-cert-20261022T152203Z`, made 15:22–15:37 UTC: 9,758 ok, 0 invalid, 0 API errors, billed $1.96. TypeSafe spend is now $4.52 against the raised $6 cap.
+- **Record:** `decisions/A2-jev.md`, written by `swapcheck jev-policy` and replayed by CI.
+
+| Rule | Weighted `dev` W / A | `cert` W | One-sided 95% upper W | `cert` A | A minus incumbent |
+|---|---:|---:|---:|---:|---:|
+| J1 `jev-c51` at τ = 1.00 | 2.29% / 42.38% | 2.22% | 2.48% | 42.96% | +40.91 pp [40.09, 41.73] |
+| J2 `jev-noul`, match ≥ 0.94 at confidence 1.00 | 1.88% / 40.59% | 2.03% | 2.28% | 40.88% | +38.83 pp [38.02, 39.65] |
+
+At the operating points its API makes available, Jev automates about as much as the best LLM candidate (`luna-none-x`: 42.89% at 1.54% W). Neither rule stays clearly below the 2% limit, though. J2 was fitted on `dev` to 1.88% and lands at 2.03% on `cert`, and its upper bound of 2.28% is above 2%. The LLM candidates' upper bounds are 1.46–1.76%. Most of Jev's excess sits in `transfers` and `out_of_scope`, as it does for every candidate. D-J's registered verdict is unchanged.
+
 ## Process notes
 
 - The NOT RUN decisions were written to the manifest with `swapcheck.manifest.add_not_run`, from the contract's budget plan, because no CLI command writes them; `decide` checks that they equal the frozen plan.
