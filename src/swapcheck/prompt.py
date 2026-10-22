@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import re
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ PROMPTS_DIR = REPO_ROOT / "prompts"
 INCUMBENT_PROMPT = PROMPTS_DIR / "incumbent-v1.md"
 JEV_PROMPT = PROMPTS_DIR / "jev-v1.yaml"
 DECISIONS_PROMPT = PROMPTS_DIR / "decisions-v1.yaml"
+ADAPTED_PROMPT = PROMPTS_DIR / "luna-none-x.md"  # the frozen D-X prompt (spec §8.3)
+DX_DIR = PROMPTS_DIR / "dx"  # every D-X iteration, `iteration-<n>.md`, n = 1..3
 INSTRUCTION_PARTS = ("routing_instruction", "oos_clause", "output_clause")
 JEV_OOS_CRITERION = "The customer message is about none of the other options."
 JEV_NOUL_QUESTION = "Does the customer message ask about any of the topics in catalog?"
@@ -99,6 +102,20 @@ def parse_prompt(text: str) -> Prompt:
 
 def load_prompt(path: Path = INCUMBENT_PROMPT) -> Prompt:
     return parse_prompt(path.read_text(encoding="utf-8"))
+
+
+def keeps_catalog(adapted: Prompt, incumbent: Prompt) -> bool:
+    """Spec §8.3: an iteration may reword the instructions and the descriptions; the catalog intents and their
+    examples stay as they are."""
+    return [(e.intent, e.example) for e in adapted.catalog] == [(e.intent, e.example) for e in incumbent.catalog]
+
+
+def changed_lines(adapted: Prompt, incumbent: Prompt) -> int:
+    """Lines of the rendered developer message that an iteration replaced, removed or added (§8.3 tie-break)."""
+    matcher = difflib.SequenceMatcher(
+        a=incumbent.developer_message().splitlines(), b=adapted.developer_message().splitlines(), autojunk=False
+    )
+    return sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in matcher.get_opcodes() if op != "equal")
 
 
 def jev_translation(prompt: Prompt) -> dict[str, Any]:

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
+from pathlib import Path
 
+import pytest
 import yaml
 
 from swapcheck import data, prompt
@@ -124,3 +127,39 @@ def test_d8_decisions_translation_reproduces_the_committed_file(incumbent: Promp
         "description": "The customer message is about none of the other options.",
     }
     assert incumbent.output_clause not in committed
+
+
+ADAPTED = [*sorted(prompt.DX_DIR.glob("iteration-*.md")), *[p for p in [prompt.ADAPTED_PROMPT] if p.exists()]]
+
+
+@pytest.mark.parametrize("path", ADAPTED, ids=lambda p: p.name)
+def test_x4_adapted_prompts_reword_only_and_leak_nothing(
+    path: Path, incumbent: Prompt, groups: IntentGroups, splits: dict[str, list[data.Item]]
+) -> None:
+    """Every D-X iteration and the frozen adapted prompt (spec §8.3) keep the catalog and its examples, and pass
+    the T-D5 and T-D6 checks the incumbent prompt passes."""
+    adapted = prompt.load_prompt(path)
+    assert prompt.keeps_catalog(adapted, incumbent)
+    assert oos_token_hits(path.read_text(encoding="utf-8"), groups) == []
+    instructions = f"{adapted.routing_instruction} {adapted.oos_clause} {adapted.output_clause}".casefold()
+    for name in groups.out_of_scope:
+        assert not re.search(rf"\b{re.escape(name.replace('_', ' ').casefold())}\b", instructions), name
+    held_out = {data.normalize(it.text) for name in ("dev", "cert") for it in splits[name]}
+    assert [s for s in prompt_sentences(adapted) if data.normalize(s) in held_out] == []
+
+
+def test_x4_rewording_counts_changed_lines_and_keeps_the_catalog(incumbent: Prompt) -> None:
+    first, second = incumbent.catalog[0], incumbent.catalog[1]
+    reworded = replace(
+        incumbent,
+        routing_instruction="Route the message.",
+        catalog=(replace(first, description="New wording."), *incumbent.catalog[1:]),
+    )
+    assert prompt.keeps_catalog(reworded, incumbent)
+    assert prompt.changed_lines(reworded, incumbent) == 2  # the instruction line and one description line
+    assert prompt.changed_lines(incumbent, incumbent) == 0
+    new_example = replace(
+        incumbent, catalog=(first, replace(second, example="Another message."), *incumbent.catalog[2:])
+    )
+    assert not prompt.keeps_catalog(new_example, incumbent)
+    assert not prompt.keeps_catalog(replace(incumbent, catalog=incumbent.catalog[1:]), incumbent)

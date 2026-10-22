@@ -248,16 +248,21 @@ def latency(runs: dict[str, Run]) -> str:
     return table(head, out)
 
 
-def order_sensitivity(runs: dict[str, Run]) -> str:
-    out = []
+def order_changes(runs: dict[str, Run]) -> dict[str, tuple[int, int]]:
+    """Per decision interface: (items whose choice changed, items ok in both orders) (§14)."""
+    out = {}
     for normal, reversed_ in ORDER_PAIRS:
         if normal not in runs or reversed_ not in runs:
             continue
         a = {r.item_id: r.intent for r in runs[normal][1] if r.status == "ok"}
         b = {r.item_id: r.intent for r in runs[reversed_][1] if r.status == "ok"}
-        both = sorted(a.keys() & b.keys())
-        changed = sum(a[i] != b[i] for i in both)
-        out.append((normal, len(both), changed, changed / len(both) if both else None))
+        both = a.keys() & b.keys()
+        out[normal] = (sum(a[i] != b[i] for i in both), len(both))
+    return out
+
+
+def order_sensitivity(runs: dict[str, Run]) -> str:
+    out = [(cid, n, changed, changed / n if n else None) for cid, (changed, n) in order_changes(runs).items()]
     return table(("interface", "items ok in both", "choice changed", "share"), out)
 
 
