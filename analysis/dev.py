@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+import numpy as np
 import power
 import yaml
 from pilot import latest_pilot_runs, order_changes, table
@@ -43,7 +44,7 @@ from swapcheck.contract import (
 from swapcheck.contract import Calibration as FrozenCalibration
 from swapcheck.freeze import CONTRACT_TAG, head_commit
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, IntentGroups, load_groups
-from swapcheck.outcomes import AnalysisRun, build_run, dev_weights
+from swapcheck.outcomes import AnalysisRun, build_run, dev_weights, weighted_rates
 from swapcheck.records import ItemRow, RunMeta, read_meta, read_rows
 from swapcheck.report import discordance, write_pdisc
 from swapcheck.runner import run_validity
@@ -225,30 +226,38 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_dx_errors(args: argparse.Namespace) -> int:
-    """Counts only: §2.5 allows reading dev errors for D-X, and rewording descriptions needs no message text."""
+    """Counts only: §2.5 allows reading dev errors for D-X, and rewording descriptions needs no message text.
+
+    The candidate is matched to the incumbent's dev W, so what limits A is how confident its wrong routes are:
+    the table lists every wrong route with its highest confidence, most confident first."""
     inputs = load(args.runs_dir)
     run = next((r for r in inputs.runs if r.meta.run_id == args.run_id), None)
     if run is None or run.meta.config_id not in ("luna-none", "luna-none-x"):
         raise SystemExit("give the run ID of a luna-none or luna-none-x dev run (§8.3)")
-    cal = fit(inputs, valid(run), fit_inc(inputs, require(inputs, "inc")))
-    r = run.run
-    auto = r.auto_mask(cal.tau)
-    wrong: Counter[tuple[str, str]] = Counter()
-    escalated: Counter[tuple[str, str]] = Counter()
-    for i in range(len(r)):
-        if r.status[i] == "api_error" or (auto[i] and r.correct[i]):
-            continue
-        truth = OUT_OF_SCOPE if r.slices[i] == OUT_OF_SCOPE else r.truth[i]
-        answer = str(r.intent[i]) if r.status[i] == "ok" else r.status[i]
-        if auto[i]:
-            wrong[truth, answer] += 1
-        elif truth != OUT_OF_SCOPE:
-            escalated[truth, answer] += 1
+    incumbent = fit_inc(inputs, require(inputs, "inc"))
+    cal = fit(inputs, valid(run), incumbent)
+    r = usable(run.run)
+    weights = dev_weights(r.truth, inputs.dev_counts, inputs.cert_counts)
     print(f"{run.meta.run_id}: tau {cal.tau}, weighted W {pct(cal.wrong)}%, A {pct(cal.automation)}%")
-    print(f"wrong auto-routes {wrong.total()}, escalated in-scope items {escalated.total()}\n")
-    print(table(("truth", "auto-routed as", "items"), [(*k, v) for k, v in wrong.most_common(args.top)]))
-    print()
-    print(table(("truth", "answer (escalated)", "items"), [(*k, v) for k, v in escalated.most_common(args.top)]))
+    print(f"matched to the incumbent's weighted dev W {pct(incumbent.wrong)}%\n")
+    levels = sorted({float(c) for c, e in zip(r.confidence, r.eligible, strict=True) if e}, reverse=True)
+    buckets = []
+    for level in levels[: args.top]:
+        at = r.eligible & (r.confidence == level)
+        rates = weighted_rates(r, level, weights)
+        wrong_here = int(np.count_nonzero(at & ~r.correct))
+        buckets.append((level, int(np.count_nonzero(at)), wrong_here, pct(rates.wrong), pct(rates.automation)))
+    print(table(("confidence", "items", "wrong", "W % at this tau", "A % at this tau"), buckets))
+    wrong: Counter[tuple[str, str]] = Counter()
+    top: dict[tuple[str, str], float] = {}
+    for i in np.flatnonzero(r.eligible & ~r.correct):
+        truth = f"{r.truth[i]} (not in catalog)" if r.slices[i] == OUT_OF_SCOPE else r.truth[i]
+        key = (truth, str(r.intent[i]))
+        wrong[key] += 1
+        top[key] = max(top.get(key, 0.0), float(r.confidence[i]))
+    rows = sorted(wrong, key=lambda k: (-top[k], -wrong[k], k))[: args.top]
+    print(f"\nwrong routes at any tau: {wrong.total()}\n")
+    print(table(("truth", "routed as", "items", "highest confidence"), [(*k, wrong[k], top[k]) for k in rows]))
     return 0
 
 
