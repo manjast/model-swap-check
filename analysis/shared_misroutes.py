@@ -51,7 +51,7 @@ def report(runs_dir: Path) -> str:
             f"Items answered by all {len(cids)} configurations: {r.n} (dropped {r.dropped}).",
             f"`{REFERENCE}` wrong auto-routes at confidence {TOP:.2f}: {r.reference_wrong}. Same queue from: "
             + ", ".join(f"`{cid}` {n}" for cid, n in r.same_answer.items())
-            + ".",
+            + f"; all {len(cids)} agree on {r.all_same}.",
             f"Shared misroutes: {r.shared} ({r.shared / r.n * 100:.2f}% of items; label out of scope for "
             f"{r.shared_out_of_scope}). At confidence {TOP:.2f}, `{REFERENCE}` auto-routes "
             f"{_percent(top.shared)} of them and {_percent(top.correct)} of its own correct answers.",

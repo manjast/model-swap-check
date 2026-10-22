@@ -34,6 +34,7 @@ class SharedMisroutes:
     shared_out_of_scope: int  # of which the label is out of scope
     reference_wrong: int  # the reference configuration's wrong auto-routes at its top threshold
     same_answer: dict[str, int]  # per other configuration: the same queue on those items
+    all_same: int  # those items where every configuration picks the reference's queue
     gates: dict[str, list[GateShares]]
 
 
@@ -87,5 +88,6 @@ def shared_misroutes(
         shared_out_of_scope=sum(first.slices[i] == OUT_OF_SCOPE for i in np.flatnonzero(shared)),
         reference_wrong=int(np.count_nonzero(ref_wrong)),
         same_answer=same,
+        all_same=int(np.count_nonzero(ref_wrong & agree)),
         gates=gates,
     )

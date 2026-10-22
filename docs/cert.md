@@ -136,8 +136,8 @@ In %. \* = the one-sided 95% upper bound of W is not below the limit. **Bold** =
 
 Added after the decisions and the latency study; no verdict changes. `python analysis/shared_misroutes.py` prints these values from the `cert` runs at the amendment 3 thresholds; it reads labels and structured fields only (T-V7). `jev-noul` is left out because it routes on the J2 signal.
 
-- **Jev's confident misroutes are everyone's misroutes.** `jev-c51` auto-routes 217 messages to a wrong queue at confidence 1.00. On those, `luna-none` picks the same queue for 216, `haiku55-off` for 214, `inc` for 212, `luna-dec` for 201 and `luna-none-x` for 175.
-- **On 423 messages (4.33%) all six configurations pick the same queue and the label says otherwise** (for 137 of them the label is out of scope). Some of these labels are debatable; every configuration is scored against the same ones.
+- **The other models give the same answers to Jev's confident misroutes.** `jev-c51` auto-routes 217 messages to a wrong queue at confidence 1.00. On those, `luna-none` picks the same queue for 216, `haiku55-off` for 214, `inc` for 212, `luna-dec` for 201 and `luna-none-x` for 175; all six agree on 165. These are answers, not auto-routes: each model's own gate decides how many of them it would act on.
+- **On 423 messages (4.33%) all six configurations pick the same queue and the label says otherwise** (for 137 of them the label is out of scope). Every configuration is scored against the same labels.
 - **The gates differ in how many of those they let through.** At the 2% limit, `luna-none` (τ 0.99) auto-routes 22% of these shared misroutes and 53% of its own correct answers; `haiku55-off` (τ 0.90) 25% and 53%. `jev-c51` at its strictest setting, 1.00, auto-routes 39% of them and 66% of its correct answers, and has no stricter setting.
 
 | Configuration | 1% | 2% | 5% | 10% | 15% |

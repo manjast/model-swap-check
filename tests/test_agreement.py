@@ -49,6 +49,7 @@ def test_shared_misroutes_hand_counts() -> None:
     assert (r.shared, r.shared_out_of_scope) == (2, 1)  # i1 and i2
     assert r.reference_wrong == 2  # i1 and i3 at 1.00; i2 sits below it, i4 is escalated
     assert r.same_answer == {"x": 1, "y": 2}  # X answers c on i3
+    assert r.all_same == 1  # i1 only
     shares = {cid: [(g.shared, g.correct) for g in gates] for cid, gates in r.gates.items()}
     assert shares == {"ref": [(0.5, 1.0)], "x": [(0.5, 1.0)], "y": [(0.5, 0.0), (1.0, 1.0)]}
 
