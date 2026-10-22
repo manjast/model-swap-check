@@ -132,6 +132,25 @@ In %. \* = the one-sided 95% upper bound of W is not below the limit. **Bold** =
 - **Against TypeSafe's claims:** typesafe.ai headlines "193.6x Faster" on System One workflows and shows 0.114 s per task for Jev against 8.566 s for LLMs. From Belgrade, Jev takes 0.28 s including about 0.08 s of round trip, and the small LLMs without reasoning take 1.0–1.3 s: a 4× advantage on this router.
 - **The `cert` timings above measured this client under load.** At concurrency 16, Jev's p50 was 0.76–2.38 s; one request at a time, it is 0.28 s.
 
+## Shared misroutes (descriptive, post hoc)
+
+Added after the decisions and the latency study; no verdict changes. `python analysis/shared_misroutes.py` prints these values from the `cert` runs at the amendment 3 thresholds; it reads labels and structured fields only (T-V7). `jev-noul` is left out because it routes on the J2 signal.
+
+- **The other models give the same answers to Jev's confident misroutes.** `jev-c51` auto-routes 217 messages to a wrong queue at confidence 1.00. On those, `luna-none` picks the same queue for 216, `haiku55-off` for 214, `inc` for 212, `luna-dec` for 201 and `luna-none-x` for 175; all six agree on 165. These are answers, not auto-routes: each model's own gate decides how many of them it would act on.
+- **On 423 messages (4.33%) all six configurations pick the same queue and the label says otherwise** (for 137 of them the label is out of scope). Every configuration is scored against the same labels.
+- **The gates differ in how many of those they let through.** At the 2% limit, `luna-none` (τ 0.99) auto-routes 22% of these shared misroutes and 53% of its own correct answers; `haiku55-off` (τ 0.90) 25% and 53%. `jev-c51` at its strictest setting, 1.00, auto-routes 39% of them and 66% of its correct answers, and has no stricter setting.
+
+| Configuration | 1% | 2% | 5% | 10% | 15% |
+|---|---:|---:|---:|---:|---:|
+| `inc` | 0% / 3% (τ 0.95) | 0% / 3% (τ 0.95) | 0% / 3% (τ 0.95) | 0% / 3% (τ 0.95) | 90% / 95% (τ 0.90) |
+| `luna-none` | 0% / 0% (τ 1.00) | 22% / 53% (τ 0.99) | 49% / 73% (τ 0.94) | 49% / 73% (τ 0.94) | 91% / 93% (τ 0.78) |
+| `luna-none-x` | 2% / 22% (τ 1.00) | 32% / 68% (τ 0.99) | 32% / 68% (τ 0.99) | 84% / 93% (τ 0.78) | 100% / 100% (τ 0.00) |
+| `haiku55-off` | 9% / 31% (τ 0.92) | 25% / 53% (τ 0.90) | 48% / 70% (τ 0.82) | 80% / 88% (τ 0.62) | 80% / 88% (τ 0.62) |
+| `luna-dec` | 14% / 27% (τ 1.00) | 23% / 42% (τ 0.99) | 58% / 76% (τ 0.87) | 88% / 94% (τ 0.55) | 100% / 100% (τ 0.00) |
+| `jev-c51` | 0% / 0% (τ 1.01) | 0% / 0% (τ 1.01) | 60% / 79% (τ 0.97) | 85% / 91% (τ 0.82) | 94% / 97% (τ 0.61) |
+
+Each cell: share of the 423 shared misroutes auto-routed / share of the configuration's own correct answers auto-routed, at its τ_L.
+
 ## Process notes
 
 - The NOT RUN decisions were written to the manifest with `swapcheck.manifest.add_not_run`, from the contract's budget plan, because no CLI command writes them; `decide` checks that they equal the frozen plan.
