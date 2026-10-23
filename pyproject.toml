@@ -23,6 +23,16 @@ dev = [
 baseline = [
     "scikit-learn==1.9.1",
 ]
+# The post hoc fine-tuned baselines (analysis/finetune_baseline.py train); on Linux without a GPU, install torch from
+# https://download.pytorch.org/whl/cpu first to skip the CUDA libraries.
+finetune = [
+    "datasets==5.1.0",
+    "scikit-learn==1.9.1",
+    "sentence-transformers==6.2.0",
+    "setfit==1.2.0",
+    "torch==2.14.1",
+    "transformers==5.20.2",
+]
 
 [project.scripts]
 swapcheck = "swapcheck.cli:main"
@@ -46,7 +56,10 @@ strict = true
 files = ["src", "tests", "analysis"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn", "sklearn.*", "joblib", "joblib.*"]
+module = [
+    "sklearn", "sklearn.*", "joblib", "joblib.*", "torch", "torch.*", "transformers", "transformers.*", "datasets",
+    "datasets.*", "setfit", "setfit.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

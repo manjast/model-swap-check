@@ -314,13 +314,32 @@ def _accuracy(run: AnalysisRun) -> float:
     return sum(bool(run.correct[i]) for i in in_scope) / len(in_scope)
 
 
+def automation(path: Path, groups: IntentGroups, dev: Sequence[Item], cert: Sequence[Item]) -> tuple[list[str], str]:
+    """Table cells for one predictions file: `automation (misroutes)` in % of `cert` at each limit, thresholds fitted
+    on its `dev` rows; then in-scope accuracy as `tuning / test`. Also used by `analysis/finetune_baseline.py`."""
+    preds: dict[str, dict[str, dict[str, Any]]] = {"dev": {}, "cert": {}}
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        for line in f:
+            p = json.loads(line)
+            preds[p["split"]][p["item_id"]] = p
+    dev_run, cert_run = _run(dev, preds["dev"], groups, "dev"), _run(cert, preds["cert"], groups, "cert")
+    counts = dict(Counter(it.intent for it in dev)), dict(Counter(it.intent for it in cert))
+    weights = dev_weights(dev_run.truth, *counts)
+    z = NormalDist().inv_cdf(0.95)
+    cells = []
+    for limit in LIMITS:
+        tau = fit_candidate(dev_run, weights, limit).tau
+        auto = cert_run.auto_mask(tau)
+        n, wrong, routed = len(cert_run), int(np.count_nonzero(auto & ~cert_run.correct)), int(auto.sum())
+        flag = "\\*" if wilson_bounds(wrong, n, z)[1] >= float(limit) else ""
+        cells.append(f"{routed / n * 100:.2f} ({wrong / n * 100:.2f}){flag}")
+    return cells, f"{_accuracy(dev_run) * 100:.1f}% / {_accuracy(cert_run) * 100:.1f}%"
+
+
 def report() -> str:
     groups = load_groups()
     splits = load_splits(groups)
     dev, cert = splits["dev"], splits["cert"]
-    dev_counts = dict(Counter(it.intent for it in dev))
-    cert_counts = dict(Counter(it.intent for it in cert))
-    z = NormalDist().inv_cdf(0.95)
     fit_record = json.loads((OUT_DIR / "fit.json").read_text())
     embed = json.loads((OUT_DIR / "embeddings.json").read_text())
     latency = json.loads((OUT_DIR / "latency.json").read_text())
@@ -334,26 +353,10 @@ def report() -> str:
     ]
     names = [*VARIANTS, *(f"{v}-folds" for v in VARIANTS if (OUT_DIR / f"predictions-{v}-folds.jsonl.gz").exists())]
     for name in names:
-        preds: dict[str, dict[str, dict[str, Any]]] = {"dev": {}, "cert": {}}
-        with gzip.open(OUT_DIR / f"predictions-{name}.jsonl.gz", "rt", encoding="utf-8") as f:
-            for line in f:
-                p = json.loads(line)
-                preds[p["split"]][p["item_id"]] = p
-        dev_run, cert_run = _run(dev, preds["dev"], groups, "dev"), _run(cert, preds["cert"], groups, "cert")
-        weights = dev_weights(dev_run.truth, dev_counts, cert_counts)
-        cells = []
-        for limit in LIMITS:
-            tau = fit_candidate(dev_run, weights, limit).tau
-            auto = cert_run.auto_mask(tau)
-            n, wrong, routed = len(cert_run), int(np.count_nonzero(auto & ~cert_run.correct)), int(auto.sum())
-            flag = "\\*" if wilson_bounds(wrong, n, z)[1] >= float(limit) else ""
-            cells.append(f"{routed / n * 100:.2f} ({wrong / n * 100:.2f}){flag}")
+        cells, accuracy = automation(OUT_DIR / f"predictions-{name}.jsonl.gz", groups, dev, cert)
         variant = name.removesuffix("-folds")
         label = f"`{variant}`" + (", fold average†" if name != variant else "")
-        lines.append(
-            f"| {label} | " + " | ".join(cells) + f" | {_accuracy(dev_run) * 100:.1f}% / "
-            f"{_accuracy(cert_run) * 100:.1f}% | {fit_record[variant]['c']:g} |"
-        )
+        lines.append(f"| {label} | " + " | ".join(cells) + f" | {accuracy} | {fit_record[variant]['c']:g} |")
     if len(names) > len(VARIANTS):
         lines += [
             "",
