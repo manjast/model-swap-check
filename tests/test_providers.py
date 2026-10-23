@@ -79,6 +79,23 @@ OPENAI_EXPECTED: dict[str, dict[str, Any]] = {
         "prompt_cache_options": {"mode": "implicit"},
         "breakpoint": False,
     },
+    # The examples ablation: the same requests as inc and luna-none, only the prompt file differs.
+    "inc-ex": {
+        "model": "gpt-4o-mini-2024-07-18",
+        "temperature": 0,
+        "reasoning": None,
+        "max_output_tokens": 100,
+        "prompt_cache_options": None,
+        "breakpoint": False,
+    },
+    "luna-none-ex": {
+        "model": "gpt-6-luna",
+        "temperature": 0,
+        "reasoning": {"effort": "none"},
+        "max_output_tokens": 200,
+        "prompt_cache_options": {"mode": "explicit", "ttl": "30m"},
+        "breakpoint": True,
+    },
 }
 
 ANTHROPIC_EXPECTED: dict[str, dict[str, Any]] = {
@@ -268,10 +285,11 @@ def test_r1_inc_prompt_cache_key_mapping(incumbent: Prompt) -> None:
 
 
 def test_r1_warmup_cache_keys() -> None:
-    assert get_adapter(CONFIGS["inc"]).warmup_cache_keys(CONFIGS["inc"]) == [f"msc-{i}" for i in range(16)]
+    for cid in ("inc", "inc-ex"):
+        assert get_adapter(CONFIGS[cid]).warmup_cache_keys(CONFIGS[cid]) == [f"msc-{i}" for i in range(16)]
     for cid in SNAPSHOT_IDS:
         cfg = CONFIGS[cid]
-        if cid == "inc":
+        if cid in ("inc", "inc-ex"):
             continue
         no_warmup = cfg.provider == "typesafe" or cid in DECISIONS_EXPECTED
         expected: list[str | None] = [] if no_warmup else [None]
