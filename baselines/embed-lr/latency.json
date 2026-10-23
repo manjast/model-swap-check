@@ -1,0 +1,508 @@
+{
+  "model": "text-embedding-3-small",
+  "measured_at": "2026-10-23T14:26:52+00:00",
+  "calls": [
+    {
+      "item_id": "test-760",
+      "latency_ms": 412.2,
+      "openai_processing_ms": "86"
+    },
+    {
+      "item_id": "test-1813",
+      "latency_ms": 277.3,
+      "openai_processing_ms": "72"
+    },
+    {
+      "item_id": "test-2503",
+      "latency_ms": 322.2,
+      "openai_processing_ms": "68"
+    },
+    {
+      "item_id": "test-382",
+      "latency_ms": 322.1,
+      "openai_processing_ms": "63"
+    },
+    {
+      "item_id": "test-1858",
+      "latency_ms": 512.2,
+      "openai_processing_ms": "76"
+    },
+    {
+      "item_id": "test-2136",
+      "latency_ms": 287.2,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-1373",
+      "latency_ms": 293.4,
+      "openai_processing_ms": "72"
+    },
+    {
+      "item_id": "test-2968",
+      "latency_ms": 328.0,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-993",
+      "latency_ms": 241.8,
+      "openai_processing_ms": "63"
+    },
+    {
+      "item_id": "test-2530",
+      "latency_ms": 258.2,
+      "openai_processing_ms": "53"
+    },
+    {
+      "item_id": "test-1153",
+      "latency_ms": 297.0,
+      "openai_processing_ms": "76"
+    },
+    {
+      "item_id": "test-2877",
+      "latency_ms": 235.5,
+      "openai_processing_ms": "65"
+    },
+    {
+      "item_id": "test-855",
+      "latency_ms": 278.8,
+      "openai_processing_ms": "72"
+    },
+    {
+      "item_id": "test-660",
+      "latency_ms": 314.2,
+      "openai_processing_ms": "83"
+    },
+    {
+      "item_id": "test-2992",
+      "latency_ms": 298.7,
+      "openai_processing_ms": "67"
+    },
+    {
+      "item_id": "test-2809",
+      "latency_ms": 253.4,
+      "openai_processing_ms": "64"
+    },
+    {
+      "item_id": "test-458",
+      "latency_ms": 368.1,
+      "openai_processing_ms": "67"
+    },
+    {
+      "item_id": "test-175",
+      "latency_ms": 301.5,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-1054",
+      "latency_ms": 276.5,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-2236",
+      "latency_ms": 334.5,
+      "openai_processing_ms": "64"
+    },
+    {
+      "item_id": "test-2702",
+      "latency_ms": 307.1,
+      "openai_processing_ms": "70"
+    },
+    {
+      "item_id": "test-1407",
+      "latency_ms": 259.9,
+      "openai_processing_ms": "54"
+    },
+    {
+      "item_id": "test-2229",
+      "latency_ms": 214.1,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-1507",
+      "latency_ms": 339.9,
+      "openai_processing_ms": "86"
+    },
+    {
+      "item_id": "test-1334",
+      "latency_ms": 309.0,
+      "openai_processing_ms": "66"
+    },
+    {
+      "item_id": "test-2553",
+      "latency_ms": 245.5,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-1921",
+      "latency_ms": 259.5,
+      "openai_processing_ms": "75"
+    },
+    {
+      "item_id": "test-2030",
+      "latency_ms": 309.2,
+      "openai_processing_ms": "64"
+    },
+    {
+      "item_id": "test-2428",
+      "latency_ms": 305.3,
+      "openai_processing_ms": "76"
+    },
+    {
+      "item_id": "test-1019",
+      "latency_ms": 283.0,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-1665",
+      "latency_ms": 262.7,
+      "openai_processing_ms": "64"
+    },
+    {
+      "item_id": "test-3042",
+      "latency_ms": 280.4,
+      "openai_processing_ms": "73"
+    },
+    {
+      "item_id": "test-1580",
+      "latency_ms": 294.6,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-106",
+      "latency_ms": 269.5,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-1425",
+      "latency_ms": 344.4,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-1368",
+      "latency_ms": 305.5,
+      "openai_processing_ms": "80"
+    },
+    {
+      "item_id": "test-901",
+      "latency_ms": 295.6,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-1490",
+      "latency_ms": 323.9,
+      "openai_processing_ms": "52"
+    },
+    {
+      "item_id": "test-2502",
+      "latency_ms": 298.3,
+      "openai_processing_ms": "66"
+    },
+    {
+      "item_id": "test-1501",
+      "latency_ms": 247.5,
+      "openai_processing_ms": "68"
+    },
+    {
+      "item_id": "test-3069",
+      "latency_ms": 379.5,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-2245",
+      "latency_ms": 294.2,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-1027",
+      "latency_ms": 311.3,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-1382",
+      "latency_ms": 302.8,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-352",
+      "latency_ms": 308.5,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-2100",
+      "latency_ms": 303.7,
+      "openai_processing_ms": "70"
+    },
+    {
+      "item_id": "test-2216",
+      "latency_ms": 252.5,
+      "openai_processing_ms": "77"
+    },
+    {
+      "item_id": "test-2270",
+      "latency_ms": 247.1,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-1641",
+      "latency_ms": 314.5,
+      "openai_processing_ms": "75"
+    },
+    {
+      "item_id": "test-2890",
+      "latency_ms": 305.2,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-1968",
+      "latency_ms": 311.0,
+      "openai_processing_ms": "67"
+    },
+    {
+      "item_id": "test-1400",
+      "latency_ms": 305.3,
+      "openai_processing_ms": "63"
+    },
+    {
+      "item_id": "test-2191",
+      "latency_ms": 304.5,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-526",
+      "latency_ms": 306.2,
+      "openai_processing_ms": "68"
+    },
+    {
+      "item_id": "test-2345",
+      "latency_ms": 307.1,
+      "openai_processing_ms": "65"
+    },
+    {
+      "item_id": "test-2187",
+      "latency_ms": 307.5,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-1996",
+      "latency_ms": 430.9,
+      "openai_processing_ms": "58"
+    },
+    {
+      "item_id": "test-932",
+      "latency_ms": 276.8,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-1086",
+      "latency_ms": 231.0,
+      "openai_processing_ms": "92"
+    },
+    {
+      "item_id": "test-299",
+      "latency_ms": 284.7,
+      "openai_processing_ms": "66"
+    },
+    {
+      "item_id": "test-1349",
+      "latency_ms": 203.8,
+      "openai_processing_ms": "71"
+    },
+    {
+      "item_id": "test-2752",
+      "latency_ms": 304.1,
+      "openai_processing_ms": "78"
+    },
+    {
+      "item_id": "test-257",
+      "latency_ms": 304.2,
+      "openai_processing_ms": "81"
+    },
+    {
+      "item_id": "test-2795",
+      "latency_ms": 293.9,
+      "openai_processing_ms": "72"
+    },
+    {
+      "item_id": "test-895",
+      "latency_ms": 272.3,
+      "openai_processing_ms": "70"
+    },
+    {
+      "item_id": "test-176",
+      "latency_ms": 354.5,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-968",
+      "latency_ms": 305.2,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-1582",
+      "latency_ms": 313.0,
+      "openai_processing_ms": "80"
+    },
+    {
+      "item_id": "test-1812",
+      "latency_ms": 300.5,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-2568",
+      "latency_ms": 307.9,
+      "openai_processing_ms": "69"
+    },
+    {
+      "item_id": "test-619",
+      "latency_ms": 244.3,
+      "openai_processing_ms": "54"
+    },
+    {
+      "item_id": "test-2591",
+      "latency_ms": 262.2,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-2449",
+      "latency_ms": 304.8,
+      "openai_processing_ms": "58"
+    },
+    {
+      "item_id": "test-429",
+      "latency_ms": 306.8,
+      "openai_processing_ms": "88"
+    },
+    {
+      "item_id": "test-2813",
+      "latency_ms": 242.7,
+      "openai_processing_ms": "55"
+    },
+    {
+      "item_id": "test-1926",
+      "latency_ms": 269.6,
+      "openai_processing_ms": "84"
+    },
+    {
+      "item_id": "test-2604",
+      "latency_ms": 312.4,
+      "openai_processing_ms": "66"
+    },
+    {
+      "item_id": "test-2058",
+      "latency_ms": 274.7,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-1740",
+      "latency_ms": 1358.0,
+      "openai_processing_ms": "1035"
+    },
+    {
+      "item_id": "test-1712",
+      "latency_ms": 311.5,
+      "openai_processing_ms": "57"
+    },
+    {
+      "item_id": "test-1229",
+      "latency_ms": 257.7,
+      "openai_processing_ms": "61"
+    },
+    {
+      "item_id": "test-2933",
+      "latency_ms": 971.1,
+      "openai_processing_ms": "746"
+    },
+    {
+      "item_id": "test-180",
+      "latency_ms": 1012.3,
+      "openai_processing_ms": "759"
+    },
+    {
+      "item_id": "test-2032",
+      "latency_ms": 262.0,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-1973",
+      "latency_ms": 354.3,
+      "openai_processing_ms": "59"
+    },
+    {
+      "item_id": "test-2628",
+      "latency_ms": 303.4,
+      "openai_processing_ms": "67"
+    },
+    {
+      "item_id": "test-637",
+      "latency_ms": 307.9,
+      "openai_processing_ms": "66"
+    },
+    {
+      "item_id": "test-2331",
+      "latency_ms": 302.7,
+      "openai_processing_ms": "75"
+    },
+    {
+      "item_id": "test-2432",
+      "latency_ms": 310.9,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-145",
+      "latency_ms": 409.7,
+      "openai_processing_ms": "131"
+    },
+    {
+      "item_id": "test-2361",
+      "latency_ms": 305.3,
+      "openai_processing_ms": "98"
+    },
+    {
+      "item_id": "test-1554",
+      "latency_ms": 304.5,
+      "openai_processing_ms": "60"
+    },
+    {
+      "item_id": "test-2261",
+      "latency_ms": 408.8,
+      "openai_processing_ms": "80"
+    },
+    {
+      "item_id": "test-374",
+      "latency_ms": 415.8,
+      "openai_processing_ms": "168"
+    },
+    {
+      "item_id": "test-2888",
+      "latency_ms": 298.2,
+      "openai_processing_ms": "64"
+    },
+    {
+      "item_id": "test-2133",
+      "latency_ms": 308.1,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-2551",
+      "latency_ms": 295.3,
+      "openai_processing_ms": "74"
+    },
+    {
+      "item_id": "test-875",
+      "latency_ms": 308.9,
+      "openai_processing_ms": "62"
+    },
+    {
+      "item_id": "test-2318",
+      "latency_ms": 316.5,
+      "openai_processing_ms": "58"
+    },
+    {
+      "item_id": "test-870",
+      "latency_ms": 278.4,
+      "openai_processing_ms": "65"
+    }
+  ],
+  "prompt_tokens": 1308,
+  "cost_usd": 2.616e-05
+}

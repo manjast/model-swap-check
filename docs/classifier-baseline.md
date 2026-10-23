@@ -24,4 +24,36 @@ A reader asked whether a dedicated classifier trained on the labelled messages w
 
 ## Results
 
-Added after the fit.
+Embeddings: 13,083 messages, 176,055 tokens, $0.0035. Output of `python analysis/classifier_baseline.py report`, automation (misroutes) in % of the 9,758 test messages; \* marks a one-sided 95% Wilson upper bound of W at or above the limit:
+
+| Variant | 1% | 2% | 5% | 10% | 15% | Top pick right, tuning / test | C |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `lr-51` | 58.76 (1.32)\* | 63.29 (2.04)\* | 71.25 (5.24)\* | 71.25 (5.24) | 71.25 (5.24) | 89.8% / 90.0% | 100 |
+| `lr-50` | 26.44 (1.75)\* | 36.78 (2.53)\* | 57.99 (5.05)\* | 72.46 (10.15)\* | 80.93 (15.48)\* | 92.9% / 93.0% | 100 |
+| `lr-51`, fold average† | 56.59 (1.08)\* | 62.11 (1.79)\* | 70.93 (5.12)\* | 70.93 (5.12) | 70.93 (5.12) | 89.8% / 89.7% | 100 |
+| `lr-50`, fold average† | 20.37 (1.04)\* | 31.33 (1.94)\* | 54.31 (4.41) | 69.89 (8.87) | 79.05 (14.29) | 92.9% / 92.9% | 100 |
+
+† Added after the results (`fit-folds`): test probabilities averaged over the five cross-fitting models, the same models whose tuning predictions set the thresholds, instead of one model retrained on all items.
+
+Cost: $0.0003 per 1,000 messages for the embedding; logistic regression adds 14 µs per message on this machine. Latency: 100 single-message embedding calls from Belgrade, p50 304 ms, p90 378 ms. A first latency sample (p50 321 ms) ran while the fit used every CPU core and was replaced by this one on an idle machine.
+
+The study's configurations at the same limits, automation in % (README table, from `decisions/A3-limits.md`), with the fairer classifier variant:
+
+| Configuration | 1% | 2% | 5% | 10% | 15% | $ per 1,000, busy / quiet | Latency p50 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `gpt-4o-mini` (incumbent) | 2.05 | 2.05 | 2.05 | 2.05 | 72.37\* | 0.218 / 0.410 | 1.02 s |
+| Luna, incumbent prompt | 0.07 | 34.75 | 50.20 | 50.20 | 71.26 | 0.039 / 0.277 | 1.26 s |
+| Luna, adapted prompt | 13.15 | 42.89 | 42.89 | 63.86 | 73.16 | 0.042 / 0.312 | – |
+| Claude Haiku 5.5 | 19.98 | 34.80 | 46.88 | 63.01 | 63.01 | 0.059 / 0.452 | 1.25 s |
+| Decisions API (Luna) | 15.87 | 25.32 | 47.27\* | 62.71\* | 70.40 | 0.232 / 0.232 | 0.28 s |
+| Jev, Choice confidence | 0.00 | 0.00 | 53.63 | 66.19 | 74.90\* | 0.146 / 0.146 | 0.28 s |
+| Jev, top confidence + catalog match | 16.11 | 40.88\* | 46.97 | 46.97 | 46.97 | 0.201 / 0.201 | 0.28 s |
+| Embeddings + LR (`lr-50`, fold average) | 20.37\* | 31.33\* | 54.31 | 69.89 | 79.05 | 0.0003 | 0.30 s |
+
+Reading:
+
+- **Accuracy:** on in-scope tuning messages (cross-fitted, so each predicted by a model that never saw it) the classifier picks the right queue 92.9% of the time, against 84.2% for `gpt-4o-mini`, 85.6% for Jev and 86.7% for Luna; on the test set, 93.0%.
+- **Cost and speed:** more than a hundred times cheaper per message than cached Luna, and about as fast as Jev and the Decisions API.
+- **Automation without examples of "none of these" (`lr-50`):** behind the adapted Luna prompt at 2% (31% against 43%), level with Haiku at 1% (with misroutes just over the limit, 1.04%) and ahead of every LLM at 5%, 10% and 15%.
+- **With examples of "none of these" (`lr-51`):** about 60% automated at 1% and 2%, far above every LLM. The test's out-of-scope messages come from topics it trained on, so this is the optimistic case.
+- **Calibration:** the scores are smooth, so a threshold can sit anywhere. The method fixed in advance still overshot: with one model retrained on all items after the thresholds were set, test misroutes went over the limit at every level for `lr-50` (2.53% at the 2% limit). Using the same five models for the test as for the thresholds brought them within the limit from 2% up. A threshold belongs to the exact model it was fitted on, the same lesson as the LLM swap.

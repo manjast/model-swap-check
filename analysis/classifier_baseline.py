@@ -1,15 +1,16 @@
 """Classifier baseline (docs/classifier-baseline.md): embeddings plus logistic regression, post hoc.
 
-Three steps, each writing under `baselines/embed-lr/`:
+Steps, each writing under `baselines/embed-lr/`:
 
-    python analysis/classifier_baseline.py embed     # paid: embeds every examples, dev and cert message once
-    python analysis/classifier_baseline.py latency   # paid: 100 sequential single-message embedding calls
-    python analysis/classifier_baseline.py fit       # local: fits both variants, writes text-free predictions
-    python analysis/classifier_baseline.py report    # local: prints the Markdown tables from the predictions
+    python analysis/classifier_baseline.py embed      # paid: embeds every examples, dev and cert message once
+    python analysis/classifier_baseline.py latency    # paid: 100 sequential single-message embedding calls
+    python analysis/classifier_baseline.py fit        # local: fits both variants, writes text-free predictions
+    python analysis/classifier_baseline.py fit-folds  # local, added after the results: fold-average test predictions
+    python analysis/classifier_baseline.py report     # local: prints the Markdown tables from the predictions
 
 The embeddings themselves stay in the git-ignored `data/embeddings/` (derived from message text); the committed
-predictions hold item IDs, the predicted intent and its probability only. `fit` needs the optional `baseline`
-dependencies (scikit-learn).
+predictions hold item IDs, the predicted intent and its probability only. `fit` and `fit-folds` need the optional
+`baseline` dependencies (scikit-learn).
 """
 
 from __future__ import annotations
@@ -241,6 +242,49 @@ def cmd_fit(_: argparse.Namespace) -> None:
     _write_json(OUT_DIR / "fit.json", fit_record)
 
 
+def cmd_fit_folds(_: argparse.Namespace) -> None:
+    """Added after the results (docs/classifier-baseline.md): `cert` probabilities averaged over the five
+    cross-fitting models instead of one model retrained on everything, so the test confidences come from the same
+    models whose `dev` predictions set the thresholds. Same C, folds and `dev` predictions as `fit`."""
+    from sklearn.model_selection import StratifiedKFold
+
+    groups = load_groups()
+    splits = load_splits(groups)
+    stored = np.load(EMBEDDINGS)
+    row = {str(item_id): i for i, item_id in enumerate(stored["item_ids"])}
+    vectors: NDArray[np.float32] = stored["vectors"]
+
+    def x(items: Sequence[Item]) -> NDArray[np.float32]:
+        return vectors[[row[it.item_id] for it in items]]
+
+    examples, dev, cert = splits["examples"], splits["dev"], splits["cert"]
+    fit_record = json.loads((OUT_DIR / "fit.json").read_text())
+    for variant in VARIANTS:
+        c = float(fit_record[variant]["c"])
+        train = [it for it in (*examples, *dev) if _label(it.intent, groups, variant) is not None]
+        dev_truth = np.array([_label(it.intent, groups, "lr-51") for it in dev])
+        proba_sum: NDArray[np.float64] | None = None
+        classes: Any = None
+        for _fit_idx, held_idx in StratifiedKFold(FOLDS, shuffle=True, random_state=SEED).split(x(dev), dev_truth):
+            held_ids = {dev[i].item_id for i in held_idx}
+            fold_train = [it for it in train if it.item_id not in held_ids]
+            clf = _model(c).fit(x(fold_train), [_label(it.intent, groups, variant) for it in fold_train])
+            proba = clf.predict_proba(x(cert))
+            proba_sum = proba if proba_sum is None else proba_sum + proba
+            classes = clf.classes_
+        assert proba_sum is not None
+        mean = proba_sum / FOLDS
+        top = mean.argmax(axis=1)
+        with gzip.open(OUT_DIR / f"predictions-{variant}.jsonl.gz", "rt", encoding="utf-8") as f:
+            dev_rows = [r for r in map(json.loads, f) if r["split"] == "dev"]
+        cert_rows = [
+            {"split": "cert", "item_id": it.item_id, "intent": str(classes[k]), "confidence": round(float(p[k]), 6)}
+            for it, k, p in zip(cert, top, mean, strict=True)
+        ]
+        _write_predictions(OUT_DIR / f"predictions-{variant}-folds.jsonl.gz", dev_rows + cert_rows)
+        print(f"{variant}-folds: C={c:g}")
+
+
 # --- report (local, no scikit-learn) ----------------------------------------------------------------------------------
 
 
@@ -288,9 +332,10 @@ def report() -> str:
         f"| Variant | {head} | Top pick right, tuning / test | C |",
         "|---|" + "---:|" * len(LIMITS) + "---:|---:|",
     ]
-    for variant in VARIANTS:
+    names = [*VARIANTS, *(f"{v}-folds" for v in VARIANTS if (OUT_DIR / f"predictions-{v}-folds.jsonl.gz").exists())]
+    for name in names:
         preds: dict[str, dict[str, dict[str, Any]]] = {"dev": {}, "cert": {}}
-        with gzip.open(OUT_DIR / f"predictions-{variant}.jsonl.gz", "rt", encoding="utf-8") as f:
+        with gzip.open(OUT_DIR / f"predictions-{name}.jsonl.gz", "rt", encoding="utf-8") as f:
             for line in f:
                 p = json.loads(line)
                 preds[p["split"]][p["item_id"]] = p
@@ -303,11 +348,18 @@ def report() -> str:
             n, wrong, routed = len(cert_run), int(np.count_nonzero(auto & ~cert_run.correct)), int(auto.sum())
             flag = "\\*" if wilson_bounds(wrong, n, z)[1] >= float(limit) else ""
             cells.append(f"{routed / n * 100:.2f} ({wrong / n * 100:.2f}){flag}")
-        record = fit_record[variant]
+        variant = name.removesuffix("-folds")
+        label = f"`{variant}`" + (", fold average†" if name != variant else "")
         lines.append(
-            f"| `{variant}` | " + " | ".join(cells) + f" | {_accuracy(dev_run) * 100:.1f}% / "
-            f"{_accuracy(cert_run) * 100:.1f}% | {record['c']:g} |"
+            f"| {label} | " + " | ".join(cells) + f" | {_accuracy(dev_run) * 100:.1f}% / "
+            f"{_accuracy(cert_run) * 100:.1f}% | {fit_record[variant]['c']:g} |"
         )
+    if len(names) > len(VARIANTS):
+        lines += [
+            "",
+            "† Added after the results: test probabilities averaged over the five cross-fitting models, the same "
+            "models whose tuning predictions set the thresholds, instead of one model retrained on all items.",
+        ]
     ms = [float(c["latency_ms"]) for c in latency["calls"]]
     per_message = embed["prompt_tokens"] / embed["items"] * embed["price_per_mtok_usd"] / 1e6
     lines += [
@@ -343,7 +395,8 @@ def _write_predictions(path: Path, rows: list[dict[str, Any]]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(required=True)
-    for name, fn in (("embed", cmd_embed), ("latency", cmd_latency), ("fit", cmd_fit), ("report", cmd_report)):
+    commands = (("embed", cmd_embed), ("latency", cmd_latency), ("fit", cmd_fit), ("fit-folds", cmd_fit_folds))
+    for name, fn in (*commands, ("report", cmd_report)):
         sub.add_parser(name).set_defaults(fn=fn)
     args = parser.parse_args()
     args.fn(args)
