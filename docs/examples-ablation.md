@@ -35,4 +35,31 @@ Scale for noise: a second `inc` run on 3,080 test items flipped 0.29 pp of outco
 
 ## Results
 
-Added after the runs.
+Runs `inc-ex-dev-20261023T134523Z` ($0.66) and `luna-none-ex-dev-20261023T134636Z` ($0.12), both complete with no invalid outputs or API errors. Output of `python analysis/examples_ablation.py`:
+
+| Configuration | τ at the 2% limit | A at the limit | W at the limit | A at 0.95 | W at 0.95 |
+|---|---:|---:|---:|---:|---:|
+| `inc` | 0.95 | 1.83% | 0.00% | 1.83% | 0.00% |
+| `inc-ex` | 0.95 | 2.36% | 0.00% | 2.36% | 0.00% |
+| `luna-none` | 0.99 | 34.55% | 1.14% | 49.58% | 3.72% |
+| `luna-none-ex` | 0.99 | 35.53% | 1.25% | 48.98% | 3.30% |
+
+`inc` → `inc-ex`: top pick right on 84.15% → 84.35% of 2000 in-scope items answered in both runs; 30 items improved, 26 got worse (sign test p = 0.69).
+`luna-none` → `luna-none-ex`: top pick right on 86.65% → 87.10% of 2000 in-scope items answered in both runs; 25 items improved, 16 got worse (sign test p = 0.21).
+
+Per replaced example: own items picked right / wrong picks attracted (all dev items, out of scope included).
+
+| Intent | `inc` | `inc-ex` | `luna-none` | `luna-none-ex` |
+|---|---:|---:|---:|---:|
+| `cash_withdrawal_not_recognised` | 95.00% / 32 | 90.00% / 4 | 87.50% / 2 | 87.50% / 1 |
+| `reverted_card_payment?` | 75.00% / 7 | 75.00% / 8 | 87.50% / 0 | 82.50% / 0 |
+| `transaction_charged_twice` | 92.50% / 1 | 92.50% / 0 | 87.50% / 0 | 90.00% / 0 |
+| `transfer_fee_charged` | 92.50% / 45 | 85.00% / 35 | 87.50% / 25 | 82.50% / 25 |
+| `transfer_timing` | 95.00% / 60 | 95.00% / 53 | 95.00% / 52 | 95.00% / 41 |
+| `wrong_exchange_rate_for_cash_withdrawal` | 77.50% / 3 | 77.50% / 4 | 75.00% / 0 | 72.50% / 0 |
+
+Reading:
+
+- **Little changes overall.** At the 2% limit automation rises by 0.53 points for `gpt-4o-mini` and 0.98 for Luna; at 0.95 Luna's misroutes fall from 3.72% to 3.30%. Accuracy moves by 0.20 and 0.45 points, and neither sign test separates the change from chance.
+- **Single examples do pull answers.** With its new example, `cash_withdrawal_not_recognised` attracts 4 wrong `gpt-4o-mini` picks instead of 32, and `transfer_timing` attracts 53 and 41 instead of 60 and 52. Some intents also lose own items (`transfer_fee_charged` 92.5% → 85.0% for `gpt-4o-mini`, 87.5% → 82.5% for Luna).
+- **For the published results:** with the six examples replaced, automation at the 2% limit on `dev` changes by about half a point for `gpt-4o-mini` and one point for Luna. The model comparisons and the finding that a threshold does not carry over to a new model are unaffected.
