@@ -88,6 +88,27 @@ configurations:
     model: gpt-6-luna  # the only ID; no dated snapshot exists
     # no temperature, reasoning, max-token or cache parameters: none exist on this endpoint
 
+  # Post hoc examples ablation (docs/examples-ablation.md): inc and luna-none with six catalog examples
+  # replaced; dev only, never part of a contract.
+  inc-ex:
+    provider: openai
+    model: gpt-4o-mini-2024-07-18
+    temperature: 0
+    max_output_tokens: 100
+    cache_mode: implicit
+    prompt_cache_keys: 16
+    prompt: prompts/examples-ablation.md
+
+  luna-none-ex:
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: none
+    temperature: 0
+    max_output_tokens: 200
+    cache_mode: explicit
+    cache_ttl: 30m
+    prompt: prompts/examples-ablation.md
+
 # Pilot-only variants (spec §9.1): caching comparison and option-order sensitivity (Jev, luna-dec).
 pilot_variants:
   luna-none-implicit:
