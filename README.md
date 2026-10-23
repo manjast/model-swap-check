@@ -77,3 +77,5 @@ No API key is needed: the replay reads the recorded responses.
 Reasoning above `medium`; Claude Haiku 4.5; `gpt-4.1-mini`; Jev 1.14; multi-turn conversations; languages other than English; streaming; latency limits for live chat or voice (latency is reported, never gated); real production traffic. Banking77 is clean, single-turn English.
 
 Data: [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) (Casanueva et al., 2020), CC BY 4.0, with the in-scope intents of Banking77-OOS (Zhang et al., 2022).
+
+Code: MIT, see [LICENSE](LICENSE).
