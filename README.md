@@ -46,7 +46,7 @@ Five decisions were registered (D-A1 Luna, D-B1 Haiku, D-J Jev, D-O Decisions AP
 - **Replay.** Every decision record is written from the recorded responses in [`runs/`](runs/) by a command, and CI regenerates all of them on every change and compares them byte for byte.
 - **Separate data.** Thresholds, reasoning effort, Jev's request design and the adapted prompt were chosen on 3,075 development messages. Each configuration ran once on the 9,758 test messages; the incumbent ran a second time on 3,080 of them to measure run-to-run noise (0.29 pp of outcomes flipped).
 - **Fixed examples.** Each intent in the [incumbent prompt](prompts/incumbent-v1.md) carries one example message, drawn by a fixed hash rule from the intent's five `examples` messages (spec §2.3, §3.1) and never edited. Some are atypical: the example for `transfer_fee_charged` never mentions a transfer. Every configuration receives the same examples, and the adapted prompt could reword only instructions and descriptions (spec §8.3). A post hoc [examples ablation](docs/examples-ablation.md) replaced the six least typical on development data: automation at the 2% limit changed by about half a point for `gpt-4o-mini` and one point for Luna.
-- **Cost.** About $14.50 in API calls for the study, pilot and development runs included, plus $0.77 for the examples ablation and under $0.01 for the classifier baseline.
+- **Cost.** About $14.50 in API calls for the study, pilot and development runs included, plus $0.77 for the examples ablation and under $0.01 for the classifier baseline. The fine-tuned baselines ran on a free Colab GPU.
 
 ## Replay the decisions
 
@@ -71,6 +71,7 @@ No API key is needed: the replay reads the recorded responses.
 - [Specification](docs/spec.md) and [test plan](docs/test-plan.md).
 - Results by phase: [pilot](docs/pilot.md) (`python analysis/pilot.py`), [development runs and contract freeze](docs/dev.md) (`python analysis/dev.py freeze`), [test runs and decisions](docs/cert.md) (`python analysis/cert_speed.py` for cost and speed), and the post hoc [examples ablation](docs/examples-ablation.md) (`python analysis/examples_ablation.py`).
 - [Classifier baseline](docs/classifier-baseline.md), post hoc: embeddings plus logistic regression trained on the labelled tuning messages, at the same misroute limits (`python analysis/classifier_baseline.py report`).
+- [Fine-tuned baselines](docs/finetune-baseline.md), post hoc: ModernBERT and SetFit fine-tuned on the same messages and folds (`python analysis/finetune_baseline.py report`).
 - [Power analysis](analysis/power.py): how often the acceptance rules certify an equally good candidate.
 - Prompts: [incumbent](prompts/incumbent-v1.md), its [Jev translation](prompts/jev-v1.yaml) and [Decisions API translation](prompts/decisions-v1.yaml), and the [adapted Luna prompt](prompts/luna-none-x.md).
 

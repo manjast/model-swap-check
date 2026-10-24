@@ -316,7 +316,8 @@ def report() -> str:
             cells, accuracy = automation(OUT_ROOT / model / f"predictions-{name}.jsonl.gz", groups, dev, cert)
             minutes, p50 = median(r["train_minutes"]), r["latency_ms"]["p50"]
             lines.append(f"| `{name}` | " + " | ".join(cells) + f" | {accuracy} | {minutes:.1f} min | {p50:.0f} ms |")
-            machines.add(f"{', '.join(r['device'])} on {r['machine']}, {r['threads']} threads")
+            threads = f"{r['threads']} CPU thread" + ("s" if r["threads"] != 1 else "")
+            machines.add(f"{', '.join(r['device'])} on {r['machine']}, {threads}")
     if machines:
         lines += ["", "Training time and single-message latency measured on: " + "; ".join(sorted(machines)) + "."]
     return "\n".join(lines)

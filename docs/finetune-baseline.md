@@ -39,4 +39,26 @@ On Windows, `.venv\Scripts\` replaces `.venv/bin/`. The first run downloads the 
 
 ## Results
 
-Added after training.
+Run on Google Colab (free tier, Tesla T4) on 2026-10-23 and 24 from the merged method commit `3f19d43`, each of the four once, all five folds to the end. Colab's own PyTorch 2.11.0 was used in place of the pinned 2.14.1, as the method says; the other packages match `pyproject.toml`. Output of `python analysis/finetune_baseline.py report`, automation (misroutes) in % of the 9,758 test messages:
+
+| Variant | 1% | 2% | 5% | 10% | 15% | Top pick right, tuning / test | Training per fold | Latency p50 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `lr-50` (embeddings + LR) | 20.37 (1.04)\* | 31.33 (1.94)\* | 54.31 (4.41) | 69.89 (8.87) | 79.05 (14.29) | 92.9% / 92.9% | - | - |
+| `lr-51` (embeddings + LR) | 56.59 (1.08)\* | 62.11 (1.79)\* | 70.93 (5.12)\* | 70.93 (5.12) | 70.93 (5.12) | 89.8% / 89.7% | - | - |
+| `modernbert-50` | 18.38 (0.91)\* | 32.80 (1.77)\* | 49.08 (3.47) | 62.53 (6.63) | 71.03 (10.75) | 88.9% / 90.3% | 4.1 min | 16 ms |
+| `modernbert-51` | 46.75 (0.49) | 53.23 (0.97) | 64.48 (3.16) | 70.49 (6.23) | 70.49 (6.23) | 85.5% / 87.6% | 5.7 min | 16 ms |
+| `setfit-50` | 8.35 (0.68) | 16.63 (1.98)\* | 33.52 (3.98) | 50.72 (7.05) | 64.04 (10.02) | 90.2% / 90.5% | 20.7 min | 11 ms |
+| `setfit-51` | 49.81 (0.92)\* | 55.95 (1.51) | 65.68 (3.80) | 72.07 (7.33) | 72.07 (7.33) | 87.8% / 88.2% | 26.5 min | 12 ms |
+
+Training time and single-message latency measured on: cuda (Tesla T4) on Linux x86_64, 1 CPU thread.
+
+\* marks a one-sided 95% Wilson upper bound of W at or above the limit. The `lr` rows are the classifier baseline's fold-average rows.
+
+Reading:
+
+- **Accuracy:** training the whole encoder did not beat the logistic regression on frozen embeddings. On in-scope tuning messages ModernBERT picks the right queue 88.9% of the time and SetFit 90.2%, against 92.9% for the logistic regression; all three are above the LLMs (84.2% for `gpt-4o-mini`, 85.6% for Jev, 86.7% for Luna).
+- **Without examples of "none of these" (`-50`):** ModernBERT is level with the logistic regression at the strict limits (18% against 20% at 1%, 33% against 31% at 2%) and behind from 5% up. It stays behind the adapted Luna prompt at 2% (43%) and just behind Haiku at 1% (20%). SetFit automates far less at the strict limits (8% at 1%, 17% at 2%).
+- **With examples of "none of these" (`-51`):** both automate about half of all messages at 1% and 2%, less than the logistic regression (57% and 62%) and with misroutes further below the limit. The same optimistic case as `lr-51`: the test's out-of-scope messages come from topics seen in training.
+- **Calibration:** with test probabilities averaged over the five fold models, measured misroutes stayed within the limit at every level for all four, including 1%, where `lr-50` landed at 1.04%.
+- **Speed and cost:** no API cost. Training takes 4 to 6 minutes per fold for ModernBERT and 21 to 27 for SetFit on a free T4; a prediction takes 11 to 16 ms on that GPU. This latency has no network round trip, so it is not comparable to the API calls from Belgrade (0.30 s for the embedding call, 0.28 to 1.26 s for the LLMs); running the encoder means hosting a model.
+- **What this does not show:** each model ran with one recipe fixed in advance. A learning-rate or epoch sweep could move ModernBERT's numbers; this baseline answers what a first, untuned fine-tune gives.
