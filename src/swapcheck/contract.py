@@ -129,10 +129,12 @@ class FrozenContractError(Exception):
 def write_contract(path: Path, contract: Contract, header: str) -> None:
     """Write `contract` as YAML after `header`. An existing file is rewritten only with identical bytes: a frozen
     contract never changes in place, a change is a new version."""
-    text = header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True)
-    if path.exists() and path.read_text(encoding="utf-8") != text:
-        raise FrozenContractError(f"{path} exists and differs from the new result; nothing was written")
+    data = (header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True)).encode()
+    if path.exists():
+        if path.read_bytes() != data:
+            raise FrozenContractError(f"{path} exists and differs from the new result; nothing was written")
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(data)
     if load_contract(path) != contract:
         raise FrozenContractError(f"{path}: the written contract does not read back unchanged")

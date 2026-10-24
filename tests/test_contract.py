@@ -25,3 +25,7 @@ def test_r13_write_contract_never_changes_an_existing_contract(tmp_path: Path) -
     with pytest.raises(FrozenContractError, match="differs"):
         write_contract(path, contract("contract-v1"), "# another header\n")
     assert path.read_bytes() == frozen
+
+    path.write_bytes(frozen.replace(b"\n", b"\r\n"))  # same text, other line endings: still not the same file
+    with pytest.raises(FrozenContractError, match="differs"):
+        write_contract(path, contract("contract-v1"), HEADER)
