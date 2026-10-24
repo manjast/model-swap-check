@@ -39,6 +39,11 @@ jobs:
           uv run --no-sync swapcheck risk-limits --output-dir "$RUNNER_TEMP/decisions"
           uv run --no-sync swapcheck latency-report --output-dir "$RUNNER_TEMP/decisions"
           diff -r decisions "$RUNNER_TEMP/decisions"
+      - name: Frozen contracts match their tags
+        run: |
+          for f in contracts/contract-v*.yaml; do
+            git diff --exit-code "$(basename "$f" .yaml)" -- "$f"
+          done
       - name: Install gitleaks
         run: |
           curl -sSL -o /tmp/gitleaks.tgz \
