@@ -1,0 +1,88 @@
+{
+  "setfit-50": {
+    "model": "sentence-transformers/paraphrase-mpnet-base-v2",
+    "revision": "6cc9279c672dc57f94445ef259b28a1b736fec8f",
+    "recipe": {
+      "iterations": 20,
+      "batch": 16,
+      "epochs": 1,
+      "head": "logistic regression, max_iter 5000"
+    },
+    "seed": 20261023,
+    "classes": 50,
+    "train_items": [
+      1850,
+      1850,
+      1850,
+      1850,
+      1850
+    ],
+    "train_minutes": [
+      20.6,
+      20.0,
+      20.7,
+      21.9,
+      21.4
+    ],
+    "device": [
+      "cuda (Tesla T4)"
+    ],
+    "machine": "Linux x86_64",
+    "commit": "3f19d432eb963dddb2eea002a92eee3e2440efaa",
+    "threads": 1,
+    "latency_ms": {
+      "calls": 100,
+      "p50": 11.3,
+      "p90": 14.6
+    },
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "transformers": "5.20.2",
+      "sentence-transformers": "6.2.0",
+      "setfit": "1.2.0"
+    }
+  },
+  "setfit-51": {
+    "model": "sentence-transformers/paraphrase-mpnet-base-v2",
+    "revision": "6cc9279c672dc57f94445ef259b28a1b736fec8f",
+    "recipe": {
+      "iterations": 20,
+      "batch": 16,
+      "epochs": 1,
+      "head": "logistic regression, max_iter 5000"
+    },
+    "seed": 20261023,
+    "classes": 51,
+    "train_items": [
+      2710,
+      2710,
+      2710,
+      2710,
+      2710
+    ],
+    "train_minutes": [
+      26.5,
+      26.0,
+      26.6,
+      26.6,
+      26.1
+    ],
+    "device": [
+      "cuda (Tesla T4)"
+    ],
+    "machine": "Linux x86_64",
+    "commit": "3f19d432eb963dddb2eea002a92eee3e2440efaa",
+    "threads": 1,
+    "latency_ms": {
+      "calls": 100,
+      "p50": 12.2,
+      "p90": 13.9
+    },
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "transformers": "5.20.2",
+      "sentence-transformers": "6.2.0",
+      "setfit": "1.2.0"
+    }
+  }
+}

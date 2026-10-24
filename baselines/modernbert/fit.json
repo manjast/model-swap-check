@@ -1,0 +1,92 @@
+{
+  "modernbert-50": {
+    "model": "answerdotai/ModernBERT-base",
+    "revision": "8949b909ec900327062f0ebf497f51aef5e6f0c8",
+    "recipe": {
+      "max_tokens": 128,
+      "batch": 32,
+      "learning_rate": 5e-05,
+      "epochs": 10,
+      "weight_decay": 0.01,
+      "warmup": 0.1
+    },
+    "seed": 20261023,
+    "classes": 50,
+    "train_items": [
+      1850,
+      1850,
+      1850,
+      1850,
+      1850
+    ],
+    "train_minutes": [
+      4.1,
+      4.0,
+      4.2,
+      4.2,
+      4.1
+    ],
+    "device": [
+      "cuda (Tesla T4)"
+    ],
+    "machine": "Linux x86_64",
+    "commit": "3f19d432eb963dddb2eea002a92eee3e2440efaa",
+    "threads": 1,
+    "latency_ms": {
+      "calls": 100,
+      "p50": 15.8,
+      "p90": 20.3
+    },
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "transformers": "5.20.2",
+      "sentence-transformers": "6.2.0",
+      "setfit": "1.2.0"
+    }
+  },
+  "modernbert-51": {
+    "model": "answerdotai/ModernBERT-base",
+    "revision": "8949b909ec900327062f0ebf497f51aef5e6f0c8",
+    "recipe": {
+      "max_tokens": 128,
+      "batch": 32,
+      "learning_rate": 5e-05,
+      "epochs": 10,
+      "weight_decay": 0.01,
+      "warmup": 0.1
+    },
+    "seed": 20261023,
+    "classes": 51,
+    "train_items": [
+      2710,
+      2710,
+      2710,
+      2710,
+      2710
+    ],
+    "train_minutes": [
+      5.7,
+      5.5,
+      5.7,
+      5.7,
+      5.6
+    ],
+    "device": [
+      "cuda (Tesla T4)"
+    ],
+    "machine": "Linux x86_64",
+    "commit": "3f19d432eb963dddb2eea002a92eee3e2440efaa",
+    "threads": 1,
+    "latency_ms": {
+      "calls": 100,
+      "p50": 15.8,
+      "p90": 18.2
+    },
+    "versions": {
+      "torch": "2.11.0+cu130",
+      "transformers": "5.20.2",
+      "sentence-transformers": "6.2.0",
+      "setfit": "1.2.0"
+    }
+  }
+}
