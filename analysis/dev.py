@@ -10,6 +10,9 @@ Usage:
     python analysis/dev.py freeze            # selections, budget plan and margins -> contracts/contract-v1.yaml
     python analysis/dev.py freeze-v2         # amendment 2 (§7.9): Jev rules J1 and J2 -> contracts/contract-v2.yaml
     python analysis/dev.py freeze-v3         # amendment 3 (§7.10): tau per risk limit -> contracts/contract-v3.yaml
+
+A freeze never changes an existing contract: it stops unless the result is byte-identical. `--output PATH` writes the
+result elsewhere for comparison.
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ from swapcheck.contract import (
     BudgetPlan,
     Contract,
     ContractConfiguration,
+    FrozenContractError,
     JevPolicy,
     OrderSensitivity,
     RiskLimits,
@@ -48,6 +52,7 @@ from swapcheck.contract import (
     load_contract,
 )
 from swapcheck.contract import Calibration as FrozenCalibration
+from swapcheck.contract import write_contract as write_contract_file
 from swapcheck.freeze import CONTRACT_TAG
 from swapcheck.groups import OUT_OF_SCOPE, REPO_ROOT, IntentGroups, load_groups
 from swapcheck.jev_policy import TOP, fit_j2
@@ -385,7 +390,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     dx = adaptation.selected.iteration
     cals["luna-none-x"] = adaptation.selected.calibration
     source = prompt.INCUMBENT_PROMPT if dx == 0 else prompt.DX_DIR / f"iteration-{dx}.md"
-    prompt.ADAPTED_PROMPT.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    selected_prompt = source.read_text(encoding="utf-8")
+    if not CONTRACT_PATH.exists():
+        prompt.ADAPTED_PROMPT.write_text(selected_prompt, encoding="utf-8")
+    elif prompt.ADAPTED_PROMPT.read_text(encoding="utf-8") != selected_prompt:
+        raise SystemExit(f"D-X selects iteration {dx}, which differs from the frozen {prompt.ADAPTED_PROMPT.name}")
 
     # §8.1 and §8.2
     reasoning: dict[Vendor, ReasoningSelection] = {}
@@ -531,14 +540,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         }
     )
     contract = contract.model_copy(update={"analysis": analysis})
-    CONTRACT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    header = "# Written by `python analysis/dev.py freeze` (spec §7.7). A change is a new contract version.\n"
-    CONTRACT_PATH.write_text(
-        header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
+    write_contract(
+        args.output,
+        contract,
+        "# Written by `python analysis/dev.py freeze` (spec §7.7). A change is a new contract version.\n",
     )
-    if load_contract(CONTRACT_PATH) != contract:
-        raise SystemExit("the written contract does not read back unchanged")
     print(summary(analysis, check))
     return 0
 
@@ -605,20 +611,23 @@ def cmd_freeze_v2(args: argparse.Namespace) -> int:
         item_lists={"cert": data.item_list_hash(inputs.splits["cert"])},
         jev_policy=policy,
     )
-    write_contract(CONTRACT_V2_PATH, contract, "freeze-v2", "§7.9, amendment 2")
+    write_contract(
+        args.output,
+        contract,
+        "# Written by `python analysis/dev.py freeze-v2` (spec §7.9, amendment 2). A change is a new version.\n",
+    )
     print(yaml.safe_dump(policy.model_dump(mode="json"), sort_keys=False, allow_unicode=True))
     return 0
 
 
-def write_contract(path: Path, contract: Contract, command: str, source: str) -> None:
-    header = f"# Written by `python analysis/dev.py {command}` (spec {source}). A change is a new version.\n"
-    path.write_text(
-        header + yaml.safe_dump(contract.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
-    if load_contract(path) != contract:
-        raise SystemExit("the written contract does not read back unchanged")
-    print(f"wrote {path.relative_to(REPO_ROOT)}\n")
+def write_contract(path: Path, contract: Contract, header: str) -> None:
+    try:
+        write_contract_file(path, contract, header)
+    except FrozenContractError as exc:
+        raise SystemExit(
+            f"{exc}\nA frozen contract changes only as a new version; to compare, use --output PATH."
+        ) from exc
+    print(f"wrote {path}\n")
 
 
 CONTRACT_V3_TAG = "contract-v3"
@@ -684,7 +693,11 @@ def cmd_freeze_v3(args: argparse.Namespace) -> int:
         item_lists={"cert": data.item_list_hash(inputs.splits["cert"])},
         risk_limits=risk,
     )
-    write_contract(CONTRACT_V3_PATH, contract, "freeze-v3", "§7.10, amendment 3")
+    write_contract(
+        args.output,
+        contract,
+        "# Written by `python analysis/dev.py freeze-v3` (spec §7.10, amendment 3). A change is a new version.\n",
+    )
     print("§7.10 weighted dev, tau W/A (%):")
     print(
         table(
@@ -744,10 +757,14 @@ def main() -> int:
     p_use.set_defaults(func=cmd_dx_use)
     p_freeze = sub.add_parser("freeze")
     p_freeze.add_argument("--pdisc-json", type=Path, default=REPO_ROOT / "scratch" / "dev-pdisc.json")
+    p_freeze.add_argument("--output", type=Path, default=CONTRACT_PATH)
     p_freeze.set_defaults(func=cmd_freeze)
     p_freeze_v2 = sub.add_parser("freeze-v2")
+    p_freeze_v2.add_argument("--output", type=Path, default=CONTRACT_V2_PATH)
     p_freeze_v2.set_defaults(func=cmd_freeze_v2)
-    sub.add_parser("freeze-v3").set_defaults(func=cmd_freeze_v3)
+    p_freeze_v3 = sub.add_parser("freeze-v3")
+    p_freeze_v3.add_argument("--output", type=Path, default=CONTRACT_V3_PATH)
+    p_freeze_v3.set_defaults(func=cmd_freeze_v3)
     args = ap.parse_args()
     result: int = args.func(args)
     return result

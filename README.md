@@ -69,7 +69,7 @@ No API key is needed: the replay reads the recorded responses.
 
 - [`WALKTHROUGH.md`](WALKTHROUGH.md): a reading path through the repository and the design decisions behind it.
 - [Specification](docs/spec.md) and [test plan](docs/test-plan.md).
-- Results by phase: [pilot](docs/pilot.md) (`python analysis/pilot.py`), [development runs and contract freeze](docs/dev.md) (`python analysis/dev.py freeze`), [test runs and decisions](docs/cert.md) (`python analysis/cert_speed.py` for cost and speed), and the post hoc [examples ablation](docs/examples-ablation.md) (`python analysis/examples_ablation.py`).
+- Results by phase: [pilot](docs/pilot.md) (`python analysis/pilot.py`), [development runs and contract freeze](docs/dev.md) (`python analysis/dev.py freeze --output /tmp/contract-v1.yaml` re-derives the contract for comparison), [test runs and decisions](docs/cert.md) (`python analysis/cert_speed.py` for cost and speed), and the post hoc [examples ablation](docs/examples-ablation.md) (`python analysis/examples_ablation.py`).
 - [Classifier baseline](docs/classifier-baseline.md), post hoc: embeddings plus logistic regression trained on the labelled tuning messages, at the same misroute limits (`python analysis/classifier_baseline.py report`).
 - [Fine-tuned baselines](docs/finetune-baseline.md), post hoc: ModernBERT and SetFit fine-tuned on the same messages and folds (`python analysis/finetune_baseline.py report`).
 - [Power analysis](analysis/power.py): how often the acceptance rules certify an equally good candidate.

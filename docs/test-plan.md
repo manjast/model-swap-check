@@ -68,6 +68,7 @@ Every test traces to a section of [`spec.md`](spec.md). Offline tests (§1–§4
 | T-R10 | The runner appends each `cert`/`aa` run to `runs/manifest.yaml` at start, and NOT RUN decisions are listed with their reason. `decide` refuses a manifest entry whose configuration, prompt, schema or item-list hash, or contract tag commit, does not match the contract, and refuses when a run directory under the tag is missing from the manifest | §7.2, §9.5, §10 |
 | T-R11 | `cert` run order and drop order: the planner orders runs as §9.1, skips `luna-R`/`haiku55-R` when §8.1 does not certify them, substitutes `low` for a dropped `medium` when `low` qualifies, drops `luna-R`, `haiku55-R`, `luna-none-x`, `luna-dec`, `aa` in that order, and stops a provider's M5 when the projection still exceeds its cap; after an in-run stop no later run for that provider starts | §8.1, §9.1, §9.5 |
 | T-R12 | Latency study with mocked HTTP: rotated sequential schedule, frozen hashes, shared-provider per-attempt budget stop and incomplete-report refusal, hand-computed timing quantiles and connection counts, spend inclusion, and decision replay unchanged by study records | §9.6 |
+| T-R13 | A frozen contract never changes in place: writing a contract over an existing file succeeds only with identical bytes and otherwise fails, leaving the file untouched. CI checks every `contracts/contract-vN.yaml` against its git tag | §7.7 |
 
 ## 5. Pilot acceptance (M3, live, ≈ $0.30)
 
