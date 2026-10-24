@@ -1,6 +1,8 @@
 # Development runs and contract freeze (M4)
 
-**Date:** 2026-10-22, 10:16–12:07 UTC. Thirteen `dev` runs on all 3,075 `dev` items, in the spec §9.1 order within each provider, each with the spend ceiling of the pre-`dev` gate (docs/pilot.md). Every run is complete and valid: 0 API errors, 1 invalid output in 39,975 items (`haiku55-low`). The records are in `runs/*-dev-*`. Everything below is reproduced by `python analysis/dev.py freeze`, which wrote [`contracts/contract-v1.yaml`](../contracts/contract-v1.yaml) and its selection records.
+**Date:** 2026-10-22, 10:16–12:07 UTC. Thirteen `dev` runs on all 3,075 `dev` items, in the spec §9.1 order within each provider, each with the spend ceiling of the pre-`dev` gate (docs/pilot.md). Every run is complete and valid: 0 API errors, 1 invalid output in 39,975 items (`haiku55-low`). The records are in `runs/*-dev-*`. `python analysis/dev.py freeze` wrote [`contracts/contract-v1.yaml`](../contracts/contract-v1.yaml) and its selection records from them; it never changes an existing contract.
+
+To re-derive the contract for comparison: `python analysis/dev.py freeze --output /tmp/contract-v1.yaml`. The competence check, every threshold, the selections and the margins come out unchanged. Four things differ, all for reasons after the freeze: the budget plan is projected from the spend so far, which now includes the test runs, so the re-derived plan drops D-J, D-O and D-X with their 2% thresholds and power; the examples ablation's configurations (`inc-ex`, `luna-none-ex`) are listed; the code version is the current commit's; and fields added in later contract versions appear as `null`.
 
 ## Spend
 

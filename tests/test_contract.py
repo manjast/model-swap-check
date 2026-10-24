@@ -13,7 +13,7 @@ def contract(tag: str) -> Contract:
     return Contract(tag=tag, configurations={}, item_lists={"cert": "a" * 64})
 
 
-def test_write_contract_never_changes_an_existing_contract(tmp_path: Path) -> None:
+def test_r13_write_contract_never_changes_an_existing_contract(tmp_path: Path) -> None:
     path = tmp_path / "contracts" / "contract-v1.yaml"
     write_contract(path, contract("contract-v1"), HEADER)
     frozen = path.read_bytes()
